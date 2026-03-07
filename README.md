@@ -30,10 +30,27 @@ To use the server, add it to the configuration file of your preferred MCP Client
 
 ### Antigravity (Google)
 *(For full details, see the [AntiGravity MCP install and configuration docs](https://goto.google.com/antigravity-mcp) or internal Google documentation).*
-Antigravity supports adding MCP servers directly.
-1. Use the Antigravity settings UI or config file to add a new server.
-2. **Command**: `uv`
-3. **Arguments**: `["run", "--directory", "/path/to/AppleContainerMCP", "apple-container-mcp"]`
+
+1. Open your global MCP settings file (typically `~/.gemini/settings.json`).
+2. Add the following entry replacing `/path/to/uv` with the path to your `uv` binary (e.g. `/opt/homebrew/bin/uv`) and `/absolute/path/to/AppleContainerMCP` with the root source folder of this repository:
+```json
+{
+  "mcpServers": {
+    "apple-container-mcp": {
+      "command": "/usr/bin/env",
+      "args": [
+        "FASTMCP_SHOW_SERVER_BANNER=false",
+        "/path/to/uv",
+        "--directory",
+        "/absolute/path/to/AppleContainerMCP",
+        "run",
+        "--quiet",
+        "apple-container-mcp"
+      ]
+    }
+  }
+}
+```
 
 ### Cursor
 *(See the [Cursor MCP Documentation](https://docs.cursor.com/advanced/models-context-protocol) for more info).*
@@ -41,7 +58,7 @@ Antigravity supports adding MCP servers directly.
 2. Click **+ Add New MCP Server**
 3. Choose **command** type.
 4. **Name**: `apple-container`
-5. **Command**: `uv run --directory /path/to/AppleContainerMCP apple-container-mcp`
+5. **Command**: `/path/to/uv run --directory /absolute/path/to/AppleContainerMCP apple-container-mcp`
 
 ### Claude Desktop
 *(See the [Official MCP Quickstart](https://modelcontextprotocol.io/quickstart/user) for full setup instructions).*
@@ -50,9 +67,17 @@ Antigravity supports adding MCP servers directly.
 ```json
 {
   "mcpServers": {
-    "apple_container": {
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/AppleContainerMCP", "apple-container-mcp"]
+    "apple-container-mcp": {
+      "command": "/usr/bin/env",
+      "args": [
+        "FASTMCP_SHOW_SERVER_BANNER=false",
+        "/path/to/uv",
+        "--directory",
+        "/absolute/path/to/AppleContainerMCP",
+        "run",
+        "--quiet",
+        "apple-container-mcp"
+      ]
     }
   }
 }
@@ -67,9 +92,17 @@ If using an MCP extension like Cline in VSCode:
 ```json
 {
   "mcpServers": {
-    "apple_container": {
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/AppleContainerMCP", "apple-container-mcp"]
+    "apple-container": {
+      "command": "/usr/bin/env",
+      "args": [
+        "FASTMCP_SHOW_SERVER_BANNER=false",
+        "/path/to/uv",
+        "--directory",
+        "/absolute/path/to/AppleContainerMCP",
+        "run",
+        "--quiet",
+        "apple-container-mcp"
+      ]
     }
   }
 }
@@ -80,10 +113,18 @@ If using an MCP extension like Cline in VSCode:
 For CLI-based LLM tools that support MCP:
 ```json
 {
-  "mcp_servers": {
-    "apple_container": {
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/AppleContainerMCP", "apple-container-mcp"]
+  "mcpServers": {
+    "apple-container-mcp": {
+      "command": "/usr/bin/env",
+      "args": [
+        "FASTMCP_SHOW_SERVER_BANNER=false",
+        "/path/to/uv",
+        "--directory",
+        "/absolute/path/to/AppleContainerMCP",
+        "run",
+        "--quiet",
+        "apple-container-mcp"
+      ]
     }
   }
 }
