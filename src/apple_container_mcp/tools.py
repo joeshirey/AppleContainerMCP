@@ -58,10 +58,10 @@ def system_status() -> Dict[str, Any]:
 # --- Container Lifecycle ---
 
 @mcp.tool()
-def run_container(image: str, cpus: Optional[int] = None, memory: Optional[str] = None, name: Optional[str] = None, detach: bool = True, ports: Optional[List[str]] = None, env: Optional[List[str]] = None) -> Dict[str, Any]:
+def run_container(image: str, cpus: Optional[int] = None, memory: Optional[str] = None, name: Optional[str] = None, detach: bool = True, ports: Optional[List[str]] = None, env: Optional[List[str]] = None, volumes: Optional[List[str]] = None) -> Dict[str, Any]:
     """
-    Start a container from an image with optional resource constraints, ports, and env vars.
-    Examples: run_container("debian", memory="4g", cpus=2, ports=["8080:8080"], env=["PORT=8080"])
+    Start a container from an image with optional resource constraints, ports, env vars, and volume mounts.
+    Examples: run_container("debian", memory="4g", cpus=2, ports=["8080:8080"], env=["PORT=8080"], volumes=["/host/path:/container/path"])
     """
     args = ["run"]
     if detach:
@@ -78,6 +78,9 @@ def run_container(image: str, cpus: Optional[int] = None, memory: Optional[str] 
     if env:
         for e in env:
             args.extend(["-e", e])
+    if volumes:
+        for v in volumes:
+            args.extend(["-v", v])
     
     args.append(image)
     

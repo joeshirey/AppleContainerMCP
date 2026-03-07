@@ -42,7 +42,7 @@ def _run_container_cmd(args: list[str]) -> dict:
 | MCP Tool Name | CLI Command Equivalent | Logic Notes |
 | :---- | :---- | :---- |
 | list_containers | container ls -a | Parse JSON array, return count and names. |
-| run_container | container run ... | Map memory, cpus, ports, and env arguments to flags. |
+| run_container | container run ... | Map memory, cpus, ports, env, and volumes arguments to flags. |
 | get_logs | container logs -n [limit] [id] | Use native `-n` flag instead of `--tail`. |
 | system_status | container system status | Check if daemon is active. |
 

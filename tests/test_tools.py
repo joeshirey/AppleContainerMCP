@@ -30,9 +30,9 @@ def test_run_container_with_options(mocker):
     mock_cmd = mocker.patch("apple_container_mcp.tools._run_container_cmd")
     mock_cmd.return_value = {"id": "67890"}
     
-    result = run_container("ubuntu", cpus=2, memory="4g", name="my-ubuntu", detach=False)
+    result = run_container("ubuntu", cpus=2, memory="4g", name="my-ubuntu", detach=False, ports=["8080:80"], env=["DEBUG=1"], volumes=["/tmp/host:/tmp/container"])
     assert result == {"id": "67890"}
-    mock_cmd.assert_called_once_with(["run", "--name", "my-ubuntu", "--cpus", "2", "--memory", "4g", "ubuntu"])
+    mock_cmd.assert_called_once_with(["run", "--name", "my-ubuntu", "--cpus", "2", "--memory", "4g", "-p", "8080:80", "-e", "DEBUG=1", "-v", "/tmp/host:/tmp/container", "ubuntu"])
 
 def test_run_container_error(mocker):
     mock_cmd = mocker.patch("apple_container_mcp.tools._run_container_cmd")
