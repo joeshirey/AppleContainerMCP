@@ -23,15 +23,51 @@ By acting as an MCP Server, this tool abstracts away the complexity of specific 
 
 ## 📥 Installation & Setup
 
-You can run this project directly via `uv`, which handles creating a virtual environment and installing the required dependencies (like `fastmcp`) on the fly. 
+You have two options for installing and running the Apple Container MCP server: using `uvx` to run it directly from GitHub (recommended), or cloning the repository to run it locally.
 
-To use the server, add it to the configuration file of your preferred MCP Client.
+Both methods require adding the server to your preferred MCP Client's configuration file.
 
-### Antigravity (Google)
+### Option A: Direct Execution via `uvx` (Recommended)
+This approach does not require cloning the repository. `uvx` will automatically fetch, sandbox, and run the latest version of the server. Ensure you have `uv` installed (`brew install uv`).
+
+### Option B: Clone & Local Environment
+Use this approach if you want to inspect or modify the code locally. 
+```bash
+git clone https://github.com/joeshirey/AppleContainerMCP.git
+cd AppleContainerMCP
+```
+*Note: For Option B, you must replace `/path/to/uv` with your actual `uv` path (e.g. `/opt/homebrew/bin/uv`) and `/absolute/path/to/AppleContainerMCP` with the directory you cloned into.*
+
+---
+
+### Configuration by Tool
+
+Below are the specific instructions for adding the MCP server to major LLM tools. Use either the **Option A** or **Option B** snippet.
+
+#### 1. Antigravity (Google)
 *(For full details, see the [AntiGravity MCP install and configuration docs](https://goto.google.com/antigravity-mcp) or internal Google documentation).*
 
-1. Open your global MCP settings file (typically `~/.gemini/settings.json`).
-2. Add the following entry replacing `/path/to/uv` with the path to your `uv` binary (e.g. `/opt/homebrew/bin/uv`) and `/absolute/path/to/AppleContainerMCP` with the root source folder of this repository:
+Open your global MCP settings file (typically `~/.gemini/settings.json`) and add:
+
+**Option A (`uvx`):**
+```json
+{
+  "mcpServers": {
+    "apple-container-mcp": {
+      "command": "/usr/bin/env",
+      "args": [
+        "FASTMCP_SHOW_SERVER_BANNER=false",
+        "uvx",
+        "--from",
+        "git+https://github.com/joeshirey/AppleContainerMCP.git",
+        "apple-container-mcp"
+      ]
+    }
+  }
+}
+```
+
+**Option B (Clone):**
 ```json
 {
   "mcpServers": {
@@ -51,18 +87,40 @@ To use the server, add it to the configuration file of your preferred MCP Client
 }
 ```
 
-### Cursor
+#### 2. Cursor
 *(See the [Cursor MCP Documentation](https://docs.cursor.com/advanced/models-context-protocol) for more info).*
 1. Open Cursor Settings -> Features -> MCP
 2. Click **+ Add New MCP Server**
 3. Choose **command** type.
 4. **Name**: `apple-container`
-5. **Command**: `/path/to/uv run --directory /absolute/path/to/AppleContainerMCP apple-container-mcp`
+5. **Command**:
+   - **Option A (`uvx`)**: `/usr/bin/env FASTMCP_SHOW_SERVER_BANNER=false uvx --from git+https://github.com/joeshirey/AppleContainerMCP.git apple-container-mcp`
+   - **Option B (Clone)**: `/usr/bin/env FASTMCP_SHOW_SERVER_BANNER=false /path/to/uv run --directory /absolute/path/to/AppleContainerMCP --quiet apple-container-mcp`
 
-### Claude Desktop
+#### 3. Claude Desktop
 *(See the [Official MCP Quickstart](https://modelcontextprotocol.io/quickstart/user) for full setup instructions).*
-1. Open the Claude Desktop configuration file (`~/Library/Application Support/Claude/claude_desktop_config.json`).
-2. Add the following entry:
+
+Open the Claude Desktop configuration file (`~/Library/Application Support/Claude/claude_desktop_config.json`) and add:
+
+**Option A (`uvx`):**
+```json
+{
+  "mcpServers": {
+    "apple-container-mcp": {
+      "command": "/usr/bin/env",
+      "args": [
+        "FASTMCP_SHOW_SERVER_BANNER=false",
+        "uvx",
+        "--from",
+        "git+https://github.com/joeshirey/AppleContainerMCP.git",
+        "apple-container-mcp"
+      ]
+    }
+  }
+}
+```
+
+**Option B (Clone):**
 ```json
 {
   "mcpServers": {
@@ -81,13 +139,32 @@ To use the server, add it to the configuration file of your preferred MCP Client
   }
 }
 ```
-3. Restart Claude Desktop.
+*(Restart Claude Desktop after updating).*
 
-### VSCode (via Cline / RooCode)
+#### 4. VSCode (via Cline / RooCode)
 *(See the [Cline MCP Documentation](https://github.com/cline/cline) for more details).*
-If using an MCP extension like Cline in VSCode:
-1. Open the extension MCP settings file (e.g. `~/.vscode/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`).
-2. Add the server configuration:
+
+Open the extension MCP settings file (e.g., `~/.vscode/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`) and add:
+
+**Option A (`uvx`):**
+```json
+{
+  "mcpServers": {
+    "apple-container": {
+      "command": "/usr/bin/env",
+      "args": [
+        "FASTMCP_SHOW_SERVER_BANNER=false",
+        "uvx",
+        "--from",
+        "git+https://github.com/joeshirey/AppleContainerMCP.git",
+        "apple-container-mcp"
+      ]
+    }
+  }
+}
+```
+
+**Option B (Clone):**
 ```json
 {
   "mcpServers": {
@@ -107,9 +184,30 @@ If using an MCP extension like Cline in VSCode:
 }
 ```
 
-### Gemini CLI
+#### 5. Gemini CLI
 *(See the [Gemini CLI Documentation](https://github.com/google/gemini-cli) for setup details).*
-For CLI-based LLM tools that support MCP:
+
+Open your Gemini CLI settings file (typically `~/.gemini/settings.json`) and add:
+
+**Option A (`uvx`):**
+```json
+{
+  "mcpServers": {
+    "apple-container-mcp": {
+      "command": "/usr/bin/env",
+      "args": [
+        "FASTMCP_SHOW_SERVER_BANNER=false",
+        "uvx",
+        "--from",
+        "git+https://github.com/joeshirey/AppleContainerMCP.git",
+        "apple-container-mcp"
+      ]
+    }
+  }
+}
+```
+
+**Option B (Clone):**
 ```json
 {
   "mcpServers": {
@@ -128,8 +226,6 @@ For CLI-based LLM tools that support MCP:
   }
 }
 ```
-
-*(Note: Make sure to replace `/path/to/AppleContainerMCP` with the actual absolute path to the repository on your machine).*
 
 ---
 
