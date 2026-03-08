@@ -210,14 +210,16 @@ def list_images() -> Dict[str, Any]:
 @mcp.tool()
 def get_logs(container_id: str, limit: int = 100) -> str:
     """Fetch recent stdout/stderr from a specific container."""
-    # Assuming there's no native JSON output for logs, or it wraps lines in JSON
-    # If the underlying CLI doesn't support --format json for logs, our wrapper might complain.
-    # We will invoke subprocess manually here to bypass --format json if it fails or use a direct command if available.
     try:
-        # Some CLI tools support native tail via `-n`
-        process = subprocess.run(["container", "logs", "-n", str(limit), container_id], capture_output=True, text=True, check=True)
-        return process.stdout or process.stderr or "No logs available."
-    except subprocess.CalledProcessError as e:
+        # Pass -n and container_id to the CLI via our wrapper
+        result = _run_container_cmd(["logs", "-n", str(limit), container_id])
+        
+        # If the command returns raw output (as expected for logs), return it.
+        # Otherwise, return it as a string if it was parsed as JSON for some reason.
+        if isinstance(result, dict):
+            return result.get("raw_output", str(result))
+        return str(result)
+    except ContainerCLIError as e:
         return f"Failed to fetch logs: {e.stderr}"
 
 @mcp.tool()
