@@ -26,8 +26,8 @@ To ensure consistency, all tools will use a shared private method \_run\_contain
 
 def _run_container_cmd(args: List[str]) -> Any:
     full_cmd = ["container"] + args
-    no_format_commands = ["system", "logs", "run", "inspect", "rm", "stop", "kill", "pull", "build", "network", "volume", "prune", "image"]
-    if "--format" not in full_cmd and not (len(args) > 0 and args[0] in no_format_commands):
+    FORMAT_JSON_COMMANDS = {"ls"}
+    if "--format" not in full_cmd and (len(args) > 0 and args[0] in FORMAT_JSON_COMMANDS):
         full_cmd.extend(["--format", "json"])
 
     try:
@@ -38,9 +38,9 @@ def _run_container_cmd(args: List[str]) -> Any:
         try:
             return json.loads(stdout)
         except json.JSONDecodeError:
-            if args[0] in no_format_commands and args[0] != "inspect":
-                return {"raw_output": stdout}
-            return {"raw_output": stdout, "error": "Failed to parse JSON"}
+            if args[0] in FORMAT_JSON_COMMANDS or args[0] == "inspect":
+                return {"raw_output": stdout, "error": "Failed to parse JSON output"}
+            return {"raw_output": stdout}
     except subprocess.CalledProcessError as e:
         # Check for daemon connection issues
         stderr_msg = e.stderr.strip().lower()

@@ -2,15 +2,17 @@ import json
 import subprocess
 from typing import Any, List
 
+
 class ContainerCLIError(Exception):
     """
     Exception raised for errors during container CLI execution.
-    
+
     Attributes:
         message (str): Human-readable error message.
         exit_code (int): The process exit code returned by the container CLI.
         stderr (str): The raw error output from the CLI.
     """
+
     def __init__(self, message: str, exit_code: int, stderr: str):
         super().__init__(message)
         self.exit_code = exit_code
@@ -20,18 +22,18 @@ class ContainerCLIError(Exception):
 def _run_container_cmd(args: List[str]) -> Any:
     """
     Executes a container CLI command.
-    Returns the parsed JSON output as a dictionary or list, 
+    Returns the parsed JSON output as a dictionary or list,
     or a raw output dictionary if the command does not support JSON.
     Raises ContainerCLIError if the command fails.
     """
     full_cmd = ["container"] + args
-    
-    # The `container` CLI is inconsistent with `--format json` support. 
-    # Some commands (like `logs` or `pull`) return streaming text that is not valid JSON.
-    # Others (like `system` or `run`) explicitly return plain text even if requested otherwise.
-    # We maintain a list of commands where we expect raw output or manage formatting manually.
-    no_format_commands = ["system", "logs", "run", "inspect", "rm", "stop", "kill", "pull", "build", "network", "volume", "prune", "image"]
-    if "--format" not in full_cmd and not (len(args) > 0 and args[0] in no_format_commands):
+
+    # The `container` CLI is inconsistent with `--format json` support.
+    # Rather than maintaining a blocklist of commands that don't support it (fragile as tools grow),
+    # we use an allowlist of the commands that are known to support it cleanly.
+    # Any command not in this set will never have --format json appended.
+    FORMAT_JSON_COMMANDS = {"ls"}
+    if "--format" not in full_cmd and (len(args) > 0 and args[0] in FORMAT_JSON_COMMANDS):
         full_cmd.extend(["--format", "json"])
 
     try:
@@ -44,14 +46,13 @@ def _run_container_cmd(args: List[str]) -> Any:
             # Attempt to natively parse the stdout as JSON
             return json.loads(stdout)
         except json.JSONDecodeError:
-            # If JSON parsing fails, but we know the command isn't supposed to return JSON 
-            # (and isn't `inspect` which we strictly expect to be JSON), return it as raw output.
-            if args[0] in no_format_commands and args[0] != "inspect":
-                return {"raw_output": stdout}
-            
-            # For all other commands, failing to parse JSON is considered an error, 
-            # though we still return the raw output for debugging.
-            return {"raw_output": stdout, "error": "Failed to parse JSON output"}
+            # Commands in FORMAT_JSON_COMMANDS are expected to return valid JSON — flag parse failures.
+            # `inspect` is a special case: it also always returns JSON (it is not in FORMAT_JSON_COMMANDS
+            # because it doesn't need --format json appended), so a parse failure is also flagged there.
+            # All other commands return raw text by design — return as raw_output without error.
+            if args[0] in FORMAT_JSON_COMMANDS or args[0] == "inspect":
+                return {"raw_output": stdout, "error": "Failed to parse JSON output"}
+            return {"raw_output": stdout}
     except subprocess.CalledProcessError as e:
         # Check for daemon not running cases.
         stderr_msg = e.stderr.strip().lower()
@@ -59,11 +60,7 @@ def _run_container_cmd(args: List[str]) -> Any:
             raise ContainerCLIError(
                 "The container-apiserver daemon is not running. Please start the system service first.",
                 e.returncode,
-                e.stderr
+                e.stderr,
             ) from e
-            
-        raise ContainerCLIError(
-            f"Command failed with exit code {e.returncode}",
-            e.returncode,
-            e.stderr
-        ) from e
+
+        raise ContainerCLIError(f"Command failed with exit code {e.returncode}", e.returncode, e.stderr) from e

@@ -19,5 +19,7 @@ jobs:
       run: uv sync --dev
     - name: Run linting
       run: uv run ruff check src/
+    - name: Check formatting
+      run: uv run ruff format --check src/
     - name: Run tests
       run: uv run pytest tests/
