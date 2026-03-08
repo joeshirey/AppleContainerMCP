@@ -118,6 +118,15 @@ def stop_container(container_id: str, force: bool = False) -> str:
         return f"Failed to {cmd} container {container_id}. Error: {e.stderr}"
 
 @mcp.tool()
+def start_container(container_id: str) -> str:
+    """Start a stopped container."""
+    try:
+        _run_container_cmd(["start", container_id])
+        return f"Successfully started container {container_id}."
+    except ContainerCLIError as e:
+        return f"Failed to start container {container_id}. Error: {e.stderr}"
+
+@mcp.tool()
 def remove_container(container_id: str, force: bool = False) -> str:
     """Clean up container resources by removing a container."""
     args = ["rm"]
