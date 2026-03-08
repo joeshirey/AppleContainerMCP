@@ -26,7 +26,7 @@ To ensure consistency, all tools will use a shared private method \_run\_contain
 
 def _run_container_cmd(args: list[str]) -> dict:  
     # Append --format json only for commands that support and require it  
-    no_format_commands = ["system", "logs", "run", "inspect", "rm", "stop", "kill", "pull", "build"]
+    no_format_commands = ["system", "logs", "run", "inspect", "rm", "stop", "kill", "pull", "build", "network", "volume", "prune", "image"]
     full_cmd = ["container"] + args
     if "--format" not in full_cmd and not (len(args) > 0 and args[0] in no_format_commands):
         full_cmd.extend(["--format", "json"])

@@ -3,7 +3,6 @@ from typing import Dict, Any, List, Optional
 import json
 import logging
 import threading
-import subprocess
 import itertools
 from .cli_wrapper import _run_container_cmd, ContainerCLIError
 

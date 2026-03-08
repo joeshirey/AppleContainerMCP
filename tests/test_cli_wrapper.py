@@ -1,6 +1,5 @@
 import pytest
 import subprocess
-import json
 from apple_container_mcp.cli_wrapper import _run_container_cmd, ContainerCLIError
 
 def test_run_container_cmd_success(mocker):

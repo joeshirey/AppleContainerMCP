@@ -1,4 +1,3 @@
-import pytest
 from apple_container_mcp.tools import check_apiserver_status, run_container, stop_container, get_logs, active_builds, build_image, check_build_status, create_network, create_volume, prune_images
 from apple_container_mcp.cli_wrapper import ContainerCLIError
 
