@@ -4,6 +4,8 @@ import json
 import logging
 import threading
 import itertools
+import os
+import re
 from .cli_wrapper import _run_container_cmd, ContainerCLIError
 
 # Set up logging for the MCP server
@@ -12,6 +14,18 @@ logger = logging.getLogger("apple-container-mcp")
 
 mcp = FastMCP("apple-container-mcp")
 
+# --- Resources ---
+
+@mcp.resource("apple-container://system/status")
+def get_system_status_resource() -> str:
+    """Provides the current system status as a resource."""
+    try:
+        status = _run_container_cmd(["system", "status"])
+        return json.dumps(status, indent=2)
+    except Exception as e:
+        return f"Error retrieving system status: {str(e)}"
+
+
 # --- System Management ---
 
 @mcp.tool()
@@ -19,50 +33,74 @@ def check_apiserver_status() -> Dict[str, Any]:
     """Check if the Apple container-apiserver daemon is running."""
     try:
         # system info expects to connect to the daemon
-        return _run_container_cmd(["system", "status"])
+        _run_container_cmd(["system", "status"])
+        return {"status": "ok", "message": "The container-apiserver daemon is running."}
     except ContainerCLIError as e:
         if "daemon is not running" in str(e).lower() or "connection refused" in str(e).lower():
             return {"status": "stopped", "error": "The container-apiserver daemon is not reachable."}
         return {"status": "error", "error": str(e), "stderr": e.stderr}
 
 @mcp.tool()
-def start_system() -> str:
+def start_system() -> Dict[str, Any]:
     """Start the Apple container system service."""
-    # Starting the service usually requires launchctl or an Apple-specific boot command
-    # Assuming `container system start` or similar based on typical CLI design.
-    # The actual command depends heavily on the specific Apple CLI implementation.
-    # Note: If it requires sudo, we should return instructions instead of failing silently.
     try:
-        result = _run_container_cmd(["system", "start"])
-        return f"System service started successfully: {json.dumps(result)}"
+        _run_container_cmd(["system", "start"])
+        return {"status": "ok", "message": "System service started successfully."}
     except ContainerCLIError as e:
-        return f"Failed to start system service. Ensure you have the right permissions. Error: {e.stderr}"
+        return {"status": "error", "message": "Failed to start system service. Ensure you have the right permissions.", "details": e.stderr}
 
 @mcp.tool()
-def stop_system() -> str:
+def stop_system() -> Dict[str, Any]:
     """Stop the Apple container system service."""
     try:
-        result = _run_container_cmd(["system", "stop"])
-        return f"System service stopped successfully: {json.dumps(result)}"
+        _run_container_cmd(["system", "stop"])
+        return {"status": "ok", "message": "System service stopped successfully."}
     except ContainerCLIError as e:
-        return f"Failed to stop system service. Error: {e.stderr}"
+        return {"status": "error", "message": "Failed to stop system service.", "details": e.stderr}
 
 @mcp.tool()
 def system_status() -> Dict[str, Any]:
     """Retrieve system-wide status (version, driver status)."""
     try:
-        return _run_container_cmd(["system", "status"])
+        result = _run_container_cmd(["system", "status"])
+        return {"status": "ok", "system_status": result}
     except ContainerCLIError as e:
-         return {"error": str(e)}
+         return {"status": "error", "message": "Failed to retrieve system status", "details": str(e)}
 
 # --- Container Lifecycle ---
 
 @mcp.tool()
-def run_container(image: str, cpus: Optional[int] = None, memory: Optional[str] = None, name: Optional[str] = None, detach: bool = True, ports: Optional[List[str]] = None, env: Optional[List[str]] = None, volumes: Optional[List[str]] = None) -> Dict[str, Any]:
+def run_container(
+    image: str, 
+    cpus: Optional[int] = None, 
+    memory: Optional[str] = None, 
+    name: Optional[str] = None, 
+    detach: bool = True, 
+    ports: Optional[List[str]] = None, 
+    env: Optional[List[str]] = None, 
+    volumes: Optional[List[str]] = None,
+    network: Optional[str] = None
+) -> Dict[str, Any]:
     """
-    Start a container from an image with optional resource constraints, ports, env vars, and volume mounts.
-    Examples: run_container("debian", memory="4g", cpus=2, ports=["8080:8080"], env=["PORT=8080"], volumes=["/host/path:/container/path"])
+    Start a container from an image with optional resource constraints, networking, ports, env vars, and volume mounts.
+    Examples: run_container("debian", memory="4g", cpus=2, ports=["8080:8080"], env=["PORT=8080"], volumes=["/host/path:/container/path"], network="my_net")
     """
+    # Lightweight input validation
+    if ports:
+        for p in ports:
+            if not re.match(r"^\d+(:\d+)?$", p):
+                return {"status": "error", "message": f"Invalid port format: {p}. Expected 'HOST:CONTAINER' or 'PORT'."}
+    
+    if env:
+        for e in env:
+            if "=" not in e:
+                return {"status": "error", "message": f"Invalid env format: {e}. Expected 'KEY=VALUE'."}
+
+    if volumes:
+        for v in volumes:
+            if ":" not in v:
+                return {"status": "error", "message": f"Invalid volume format: {v}. Expected 'HOST:CONTAINER'."}
+
     args = ["run"]
     if detach:
         args.append("-d")
@@ -72,6 +110,8 @@ def run_container(image: str, cpus: Optional[int] = None, memory: Optional[str] 
         args.extend(["--cpus", str(cpus)])
     if memory:
         args.extend(["--memory", memory])
+    if network:
+        args.extend(["--network", network])
     if ports:
         for p in ports:
             args.extend(["-p", p])
@@ -86,11 +126,10 @@ def run_container(image: str, cpus: Optional[int] = None, memory: Optional[str] 
     
     try:
         result = _run_container_cmd(args)
-        if isinstance(result, dict) and "raw_output" in result:
-             return {"id": result["raw_output"]}
-        return result if isinstance(result, dict) else {"result": result}
+        container_id = result.get("raw_output") if isinstance(result, dict) else str(result)
+        return {"status": "ok", "id": container_id}
     except ContainerCLIError as e:
-        return {"error": "Failed to run container", "details": e.stderr, "exit_code": e.exit_code}
+        return {"status": "error", "message": "Failed to run container", "details": e.stderr, "exit_code": e.exit_code}
 
 @mcp.tool()
 def list_containers(all: bool = True) -> Dict[str, Any]:
@@ -101,32 +140,32 @@ def list_containers(all: bool = True) -> Dict[str, Any]:
         
     try:
         result = _run_container_cmd(args)
-        # Assuming the CLI returns a valid JSON array or object
-        return {"containers": result, "count": len(result) if isinstance(result, list) else 1}
+        containers = result if isinstance(result, list) else [result]
+        return {"status": "ok", "containers": containers, "count": len(containers)}
     except ContainerCLIError as e:
-        return {"error": "Failed to list containers", "details": e.stderr}
+        return {"status": "error", "message": "Failed to list containers", "details": e.stderr}
 
 @mcp.tool()
-def stop_container(container_id: str, force: bool = False) -> str:
+def stop_container(container_id: str, force: bool = False) -> Dict[str, Any]:
     """Gracefully or forcefully terminate a container."""
     cmd = "kill" if force else "stop"
     try:
         _run_container_cmd([cmd, container_id])
-        return f"Successfully executed '{cmd}' on container {container_id}."
+        return {"status": "ok", "message": f"Successfully executed '{cmd}' on container {container_id}."}
     except ContainerCLIError as e:
-        return f"Failed to {cmd} container {container_id}. Error: {e.stderr}"
+        return {"status": "error", "message": f"Failed to {cmd} container {container_id}.", "details": e.stderr}
 
 @mcp.tool()
-def start_container(container_id: str) -> str:
+def start_container(container_id: str) -> Dict[str, Any]:
     """Start a stopped container."""
     try:
         _run_container_cmd(["start", container_id])
-        return f"Successfully started container {container_id}."
+        return {"status": "ok", "message": f"Successfully started container {container_id}."}
     except ContainerCLIError as e:
-        return f"Failed to start container {container_id}. Error: {e.stderr}"
+        return {"status": "error", "message": f"Failed to start container {container_id}.", "details": e.stderr}
 
 @mcp.tool()
-def remove_container(container_id: str, force: bool = False) -> str:
+def remove_container(container_id: str, force: bool = False) -> Dict[str, Any]:
     """Clean up container resources by removing a container."""
     args = ["rm"]
     if force:
@@ -135,20 +174,20 @@ def remove_container(container_id: str, force: bool = False) -> str:
     
     try:
         _run_container_cmd(args)
-        return f"Successfully removed container {container_id}."
+        return {"status": "ok", "message": f"Successfully removed container {container_id}."}
     except ContainerCLIError as e:
-        return f"Failed to remove container {container_id}. Error: {e.stderr}"
+        return {"status": "error", "message": f"Failed to remove container {container_id}.", "details": e.stderr}
 
 # --- Image Management ---
 
 @mcp.tool()
-def pull_image(image: str) -> str:
+def pull_image(image: str) -> Dict[str, Any]:
     """Download an image from a registry."""
     try:
         _run_container_cmd(["pull", image])
-        return f"Successfully pulled image '{image}'."
+        return {"status": "ok", "message": f"Successfully pulled image '{image}'."}
     except ContainerCLIError as e:
-        return f"Failed to pull image '{image}'. Error: {e.stderr}"
+        return {"status": "error", "message": f"Failed to pull image '{image}'.", "details": e.stderr}
 
 
 # Thread-safe storage and counter for active builds.
@@ -181,12 +220,17 @@ def _run_build_thread(build_id: str, context_path: str, tag: Optional[str] = Non
             active_builds[build_id] = f"Unexpected error during build: {str(e)}"
 
 @mcp.tool()
-def build_image(context_path: str, tag: Optional[str] = None) -> str:
+def build_image(context_path: str, tag: Optional[str] = None) -> Dict[str, str]:
     """
     Build an image from a local context path.
     Runs asynchronously since builds can be long-running.
     Returns a build_id you can use to check status with check_build_status.
     """
+    if not os.path.exists(context_path):
+        return {"status": "error", "message": f"Context path does not exist: {context_path}"}
+    if not os.path.isdir(context_path):
+        return {"status": "error", "message": f"Context path is not a directory: {context_path}"}
+
     build_id = f"build_{next(_build_id_counter)}"
     
     with _builds_lock:
@@ -196,22 +240,26 @@ def build_image(context_path: str, tag: Optional[str] = None) -> str:
     thread.daemon = True
     thread.start()
     
-    return f"Build started asynchronously with ID '{build_id}'. Check status later."
+    return {"status": "ok", "message": f"Build started asynchronously with ID '{build_id}'. Check status later.", "build_id": build_id}
 
 @mcp.tool()
-def check_build_status(build_id: str) -> str:
+def check_build_status(build_id: str) -> Dict[str, Any]:
     """Check the status of an asynchronous image build."""
     with _builds_lock:
-        return active_builds.get(build_id, f"No build found with ID '{build_id}'.")
+        status = active_builds.get(build_id)
+        if status:
+            return {"status": "ok", "build_status": status}
+        return {"status": "error", "message": f"No build found with ID '{build_id}'."}
 
 @mcp.tool()
 def list_images() -> Dict[str, Any]:
     """View available local images."""
     try:
         result = _run_container_cmd(["image", "ls"])
-        return {"images": result} if isinstance(result, list) else result
+        images = result if isinstance(result, list) else [result]
+        return {"status": "ok", "images": images, "count": len(images)}
     except ContainerCLIError as e:
-        return {"error": "Failed to list images", "details": e.stderr}
+        return {"status": "error", "message": "Failed to list images", "details": e.stderr}
 
 # --- Inspection & Logs ---
 
@@ -234,14 +282,15 @@ def get_logs(container_id: str, limit: int = 100) -> str:
 def inspect_container(container_id: str) -> Dict[str, Any]:
     """Get detailed low-level configuration of a container."""
     try:
-        return _run_container_cmd(["inspect", container_id])
+        result = _run_container_cmd(["inspect", container_id])
+        return {"status": "ok", "inspection": result}
     except ContainerCLIError as e:
-         return {"error": "Failed to inspect container", "details": e.stderr}
+         return {"status": "error", "message": "Failed to inspect container", "details": e.stderr}
 
 # --- Network Management ---
 
 @mcp.tool()
-def create_network(name: str, subnet: Optional[str] = None) -> str:
+def create_network(name: str, subnet: Optional[str] = None) -> Dict[str, Any]:
     """Creates a new network with the given name and optional subnet (e.g., 192.168.100.0/24)."""
     args = ["network", "create"]
     if subnet:
@@ -249,49 +298,51 @@ def create_network(name: str, subnet: Optional[str] = None) -> str:
     args.append(name)
     try:
         _run_container_cmd(args)
-        return f"Successfully created network '{name}'."
+        return {"status": "ok", "message": f"Successfully created network '{name}'."}
     except ContainerCLIError as e:
-        return f"Failed to create network '{name}'. Error: {e.stderr}"
+        return {"status": "error", "message": f"Failed to create network '{name}'.", "details": e.stderr}
 
 @mcp.tool()
-def remove_network(name: str) -> str:
+def remove_network(name: str) -> Dict[str, Any]:
     """Deletes a network."""
     try:
         _run_container_cmd(["network", "rm", name])
-        return f"Successfully removed network '{name}'."
+        return {"status": "ok", "message": f"Successfully removed network '{name}'."}
     except ContainerCLIError as e:
-        return f"Failed to remove network '{name}'. Error: {e.stderr}"
+        return {"status": "error", "message": f"Failed to remove network '{name}'.", "details": e.stderr}
 
 @mcp.tool()
 def list_networks() -> Dict[str, Any]:
     """Lists user-defined networks."""
     try:
         result = _run_container_cmd(["network", "ls"])
-        return {"networks": result} if isinstance(result, list) else result
+        networks = result if isinstance(result, list) else [result]
+        return {"status": "ok", "networks": networks, "count": len(networks)}
     except ContainerCLIError as e:
-        return {"error": "Failed to list networks", "details": e.stderr}
+        return {"status": "error", "message": "Failed to list networks", "details": e.stderr}
 
 @mcp.tool()
 def inspect_network(name: str) -> Dict[str, Any]:
     """Shows detailed information about a network."""
     try:
-        return _run_container_cmd(["network", "inspect", name])
+        result = _run_container_cmd(["network", "inspect", name])
+        return {"status": "ok", "inspection": result}
     except ContainerCLIError as e:
-        return {"error": f"Failed to inspect network '{name}'", "details": e.stderr}
+        return {"status": "error", "message": f"Failed to inspect network '{name}'", "details": e.stderr}
 
 @mcp.tool()
-def prune_networks() -> str:
+def prune_networks() -> Dict[str, Any]:
     """Removes networks not connected to any containers."""
     try:
         _run_container_cmd(["network", "prune"])
-        return "Successfully pruned unused networks."
+        return {"status": "ok", "message": "Successfully pruned unused networks."}
     except ContainerCLIError as e:
-        return f"Failed to prune networks. Error: {e.stderr}"
+        return {"status": "error", "message": "Failed to prune networks.", "details": e.stderr}
 
 # --- Volume Management ---
 
 @mcp.tool()
-def create_volume(name: str, size: Optional[str] = None) -> str:
+def create_volume(name: str, size: Optional[str] = None) -> Dict[str, Any]:
     """Creates a new named volume with an optional size (e.g., '10G')."""
     args = ["volume", "create"]
     if size:
@@ -299,70 +350,72 @@ def create_volume(name: str, size: Optional[str] = None) -> str:
     args.append(name)
     try:
         _run_container_cmd(args)
-        return f"Successfully created volume '{name}'."
+        return {"status": "ok", "message": f"Successfully created volume '{name}'."}
     except ContainerCLIError as e:
-        return f"Failed to create volume '{name}'. Error: {e.stderr}"
+        return {"status": "error", "message": f"Failed to create volume '{name}'.", "details": e.stderr}
 
 @mcp.tool()
-def remove_volume(name: str) -> str:
+def remove_volume(name: str) -> Dict[str, Any]:
     """Deletes a volume by name."""
     try:
         _run_container_cmd(["volume", "rm", name])
-        return f"Successfully removed volume '{name}'."
+        return {"status": "ok", "message": f"Successfully removed volume '{name}'."}
     except ContainerCLIError as e:
-        return f"Failed to remove volume '{name}'. Error: {e.stderr}"
+        return {"status": "error", "message": f"Failed to remove volume '{name}'.", "details": e.stderr}
 
 @mcp.tool()
 def list_volumes() -> Dict[str, Any]:
     """Lists volumes."""
     try:
         result = _run_container_cmd(["volume", "ls"])
-        return {"volumes": result} if isinstance(result, list) else result
+        volumes = result if isinstance(result, list) else [result]
+        return {"status": "ok", "volumes": volumes, "count": len(volumes)}
     except ContainerCLIError as e:
-        return {"error": "Failed to list volumes", "details": e.stderr}
+        return {"status": "error", "message": "Failed to list volumes", "details": e.stderr}
 
 @mcp.tool()
 def inspect_volume(name: str) -> Dict[str, Any]:
     """Displays detailed information for a volume."""
     try:
-        return _run_container_cmd(["volume", "inspect", name])
+        result = _run_container_cmd(["volume", "inspect", name])
+        return {"status": "ok", "inspection": result}
     except ContainerCLIError as e:
-        return {"error": f"Failed to inspect volume '{name}'", "details": e.stderr}
+        return {"status": "error", "message": f"Failed to inspect volume '{name}'", "details": e.stderr}
 
 @mcp.tool()
-def prune_volumes() -> str:
+def prune_volumes() -> Dict[str, Any]:
     """Removes all volumes that have no container references."""
     try:
         _run_container_cmd(["volume", "prune"])
-        return "Successfully pruned unused volumes."
+        return {"status": "ok", "message": "Successfully pruned unused volumes."}
     except ContainerCLIError as e:
-        return f"Failed to prune volumes. Error: {e.stderr}"
+        return {"status": "error", "message": "Failed to prune volumes.", "details": e.stderr}
 
 # --- Cleanup & Prune ---
 
 @mcp.tool()
-def prune_containers() -> str:
+def prune_containers() -> Dict[str, Any]:
     """Removes stopped containers to reclaim disk space."""
     try:
         _run_container_cmd(["prune"])
-        return "Successfully pruned stopped containers."
+        return {"status": "ok", "message": "Successfully pruned stopped containers."}
     except ContainerCLIError as e:
-        return f"Failed to prune containers. Error: {e.stderr}"
+        return {"status": "error", "message": "Failed to prune containers.", "details": e.stderr}
 
 @mcp.tool()
-def prune_images(all: bool = False) -> str:
+def prune_images(all: bool = False) -> Dict[str, Any]:
     """Removes unused images to reclaim disk space. Set `all=True` to remove all unreferenced images (not just dangling ones)."""
     args = ["image", "prune"]
     if all:
         args.append("-a")
     try:
         _run_container_cmd(args)
-        return "Successfully pruned unused images."
+        return {"status": "ok", "message": "Successfully pruned unused images."}
     except ContainerCLIError as e:
-        return f"Failed to prune images. Error: {e.stderr}"
+        return {"status": "error", "message": "Failed to prune images.", "details": e.stderr}
 
 @mcp.tool()
-def remove_image(image: str, force: bool = False) -> str:
+def remove_image(image: str, force: bool = False) -> Dict[str, Any]:
     """Deletes one or more images from local storage."""
     args = ["image", "rm"]
     if force:
@@ -370,6 +423,6 @@ def remove_image(image: str, force: bool = False) -> str:
     args.append(image)
     try:
         _run_container_cmd(args)
-        return f"Successfully removed image '{image}'."
+        return {"status": "ok", "message": f"Successfully removed image '{image}'."}
     except ContainerCLIError as e:
-        return f"Failed to remove image '{image}'. Error: {e.stderr}"
+        return {"status": "error", "message": f"Failed to remove image '{image}'.", "details": e.stderr}
