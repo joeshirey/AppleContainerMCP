@@ -13,7 +13,7 @@ The solution is built as a Python-based MCP server using the FastMCP framework. 
 
 ## **2\. Technical Stack**
 
-* **Language:** Python 3.10+  
+* **Language:** Python 3.11+  
 * **Framework:** mcp / fastmcp  
 * **Communication:** Standard I/O (stdio)  
 * **Serialization:** JSON (native container output)

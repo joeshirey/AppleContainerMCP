@@ -1,9 +1,16 @@
 import json
 import subprocess
-from typing import Dict, Any, List, Optional
+from typing import Any, List
 
 class ContainerCLIError(Exception):
-    """Exception raised for errors during container CLI execution."""
+    """
+    Exception raised for errors during container CLI execution.
+    
+    Attributes:
+        message (str): Human-readable error message.
+        exit_code (int): The process exit code returned by the container CLI.
+        stderr (str): The raw error output from the CLI.
+    """
     def __init__(self, message: str, exit_code: int, stderr: str):
         super().__init__(message)
         self.exit_code = exit_code
@@ -20,11 +27,9 @@ def _run_container_cmd(args: List[str]) -> Any:
     full_cmd = ["container"] + args
     
     # Apple's `container` CLI is inconsistent with the `--format json` flag.
-    # Some commands (like `image ls`) support it and return JSON.
-    # Others (like `run`, `rm`, `logs`) either fail if it's passed, or their output 
-    # fundamentally isn't JSON. `inspect` outputs JSON naturally without the flag.
-    # We maintain an explicit list of commands that should *not* receive the flag.
-    no_format_commands = ["system", "logs", "run", "inspect", "rm", "stop", "kill", "pull", "build"]
+    # We maintain an explicit list of commands that should *not* receive the flag
+    # because they either don't support it or we want raw output (e.g., logs).
+    no_format_commands = ["system", "logs", "run", "inspect", "rm", "stop", "kill", "pull", "build", "network", "volume", "prune"]
     if "--format" not in full_cmd and not (len(args) > 0 and args[0] in no_format_commands):
         full_cmd.extend(["--format", "json"])
 
@@ -61,6 +66,3 @@ def _run_container_cmd(args: List[str]) -> Any:
             e.returncode,
             e.stderr
         ) from e
-    except json.JSONDecodeError as e:
-        # The TDD assumes all output is JSON, but if it's not, we should probably still return it or error clearly
-        return {"raw_output": process.stdout.strip(), "error": "Failed to parse JSON output"}

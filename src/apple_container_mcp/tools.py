@@ -4,6 +4,7 @@ import json
 import logging
 import threading
 import subprocess
+import itertools
 from .cli_wrapper import _run_container_cmd, ContainerCLIError
 
 # Set up logging for the MCP server
@@ -142,11 +143,19 @@ def pull_image(image: str) -> str:
         return f"Failed to pull image '{image}'. Error: {e.stderr}"
 
 
-# In-memory store for active builds
+# Thread-safe storage and counter for active builds.
+# active_builds: maps build_id to status strings.
+# _builds_lock: guards access to active_builds to prevent race conditions.
+# _build_id_counter: provides unique incrementing IDs for builds.
 active_builds: Dict[str, str] = {}
-build_counter = 0
+_builds_lock = threading.Lock()
+_build_id_counter = itertools.count()
 
 def _run_build_thread(build_id: str, context_path: str, tag: Optional[str] = None):
+    """
+    Internal worker function executed in a background thread to run container builds.
+    Updates the global active_builds dictionary with the outcome.
+    """
     args = ["build"]
     if tag:
         args.extend(["-t", tag])
@@ -154,11 +163,14 @@ def _run_build_thread(build_id: str, context_path: str, tag: Optional[str] = Non
     
     try:
         result = _run_container_cmd(args)
-        active_builds[build_id] = f"Completed successfully. Output: {json.dumps(result)}"
+        with _builds_lock:
+            active_builds[build_id] = f"Completed successfully. Output: {json.dumps(result)}"
     except ContainerCLIError as e:
-        active_builds[build_id] = f"Failed with exit code {e.exit_code}. Error: {e.stderr}"
+        with _builds_lock:
+            active_builds[build_id] = f"Failed with exit code {e.exit_code}. Error: {e.stderr}"
     except Exception as e:
-        active_builds[build_id] = f"Unexpected error during build: {str(e)}"
+        with _builds_lock:
+            active_builds[build_id] = f"Unexpected error during build: {str(e)}"
 
 @mcp.tool()
 def build_image(context_path: str, tag: Optional[str] = None) -> str:
@@ -167,11 +179,10 @@ def build_image(context_path: str, tag: Optional[str] = None) -> str:
     Runs asynchronously since builds can be long-running.
     Returns a build_id you can use to check status with check_build_status.
     """
-    global build_counter
-    build_id = f"build_{build_counter}"
-    build_counter += 1
+    build_id = f"build_{next(_build_id_counter)}"
     
-    active_builds[build_id] = "In progress..."
+    with _builds_lock:
+        active_builds[build_id] = "In progress..."
     
     thread = threading.Thread(target=_run_build_thread, args=(build_id, context_path, tag))
     thread.daemon = True
@@ -182,7 +193,8 @@ def build_image(context_path: str, tag: Optional[str] = None) -> str:
 @mcp.tool()
 def check_build_status(build_id: str) -> str:
     """Check the status of an asynchronous image build."""
-    return active_builds.get(build_id, f"No build found with ID '{build_id}'.")
+    with _builds_lock:
+        return active_builds.get(build_id, f"No build found with ID '{build_id}'.")
 
 @mcp.tool()
 def list_images() -> Dict[str, Any]:
@@ -215,3 +227,139 @@ def inspect_container(container_id: str) -> Dict[str, Any]:
         return _run_container_cmd(["inspect", container_id])
     except ContainerCLIError as e:
          return {"error": "Failed to inspect container", "details": e.stderr}
+
+# --- Network Management ---
+
+@mcp.tool()
+def create_network(name: str, subnet: Optional[str] = None) -> str:
+    """Creates a new network with the given name and optional subnet (e.g., 192.168.100.0/24)."""
+    args = ["network", "create"]
+    if subnet:
+        args.extend(["--subnet", subnet])
+    args.append(name)
+    try:
+        _run_container_cmd(args)
+        return f"Successfully created network '{name}'."
+    except ContainerCLIError as e:
+        return f"Failed to create network '{name}'. Error: {e.stderr}"
+
+@mcp.tool()
+def remove_network(name: str) -> str:
+    """Deletes a network."""
+    try:
+        _run_container_cmd(["network", "rm", name])
+        return f"Successfully removed network '{name}'."
+    except ContainerCLIError as e:
+        return f"Failed to remove network '{name}'. Error: {e.stderr}"
+
+@mcp.tool()
+def list_networks() -> Dict[str, Any]:
+    """Lists user-defined networks."""
+    try:
+        result = _run_container_cmd(["network", "ls"])
+        return {"networks": result} if isinstance(result, list) else result
+    except ContainerCLIError as e:
+        return {"error": "Failed to list networks", "details": e.stderr}
+
+@mcp.tool()
+def inspect_network(name: str) -> Dict[str, Any]:
+    """Shows detailed information about a network."""
+    try:
+        return _run_container_cmd(["network", "inspect", name])
+    except ContainerCLIError as e:
+        return {"error": f"Failed to inspect network '{name}'", "details": e.stderr}
+
+@mcp.tool()
+def prune_networks() -> str:
+    """Removes networks not connected to any containers."""
+    try:
+        _run_container_cmd(["network", "prune"])
+        return "Successfully pruned unused networks."
+    except ContainerCLIError as e:
+        return f"Failed to prune networks. Error: {e.stderr}"
+
+# --- Volume Management ---
+
+@mcp.tool()
+def create_volume(name: str, size: Optional[str] = None) -> str:
+    """Creates a new named volume with an optional size (e.g., '10G')."""
+    args = ["volume", "create"]
+    if size:
+        args.extend(["-s", size])
+    args.append(name)
+    try:
+        _run_container_cmd(args)
+        return f"Successfully created volume '{name}'."
+    except ContainerCLIError as e:
+        return f"Failed to create volume '{name}'. Error: {e.stderr}"
+
+@mcp.tool()
+def remove_volume(name: str) -> str:
+    """Deletes a volume by name."""
+    try:
+        _run_container_cmd(["volume", "rm", name])
+        return f"Successfully removed volume '{name}'."
+    except ContainerCLIError as e:
+        return f"Failed to remove volume '{name}'. Error: {e.stderr}"
+
+@mcp.tool()
+def list_volumes() -> Dict[str, Any]:
+    """Lists volumes."""
+    try:
+        result = _run_container_cmd(["volume", "ls"])
+        return {"volumes": result} if isinstance(result, list) else result
+    except ContainerCLIError as e:
+        return {"error": "Failed to list volumes", "details": e.stderr}
+
+@mcp.tool()
+def inspect_volume(name: str) -> Dict[str, Any]:
+    """Displays detailed information for a volume."""
+    try:
+        return _run_container_cmd(["volume", "inspect", name])
+    except ContainerCLIError as e:
+        return {"error": f"Failed to inspect volume '{name}'", "details": e.stderr}
+
+@mcp.tool()
+def prune_volumes() -> str:
+    """Removes all volumes that have no container references."""
+    try:
+        _run_container_cmd(["volume", "prune"])
+        return "Successfully pruned unused volumes."
+    except ContainerCLIError as e:
+        return f"Failed to prune volumes. Error: {e.stderr}"
+
+# --- Cleanup & Prune ---
+
+@mcp.tool()
+def prune_containers() -> str:
+    """Removes stopped containers to reclaim disk space."""
+    try:
+        _run_container_cmd(["prune"])
+        return "Successfully pruned stopped containers."
+    except ContainerCLIError as e:
+        return f"Failed to prune containers. Error: {e.stderr}"
+
+@mcp.tool()
+def prune_images(all: bool = False) -> str:
+    """Removes unused images to reclaim disk space. Set `all=True` to remove all unreferenced images (not just dangling ones)."""
+    args = ["image", "prune"]
+    if all:
+        args.append("-a")
+    try:
+        _run_container_cmd(args)
+        return "Successfully pruned unused images."
+    except ContainerCLIError as e:
+        return f"Failed to prune images. Error: {e.stderr}"
+
+@mcp.tool()
+def remove_image(image: str, force: bool = False) -> str:
+    """Deletes one or more images from local storage."""
+    args = ["image", "rm"]
+    if force:
+        args.append("-f")
+    args.append(image)
+    try:
+        _run_container_cmd(args)
+        return f"Successfully removed image '{image}'."
+    except ContainerCLIError as e:
+        return f"Failed to remove image '{image}'. Error: {e.stderr}"

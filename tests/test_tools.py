@@ -1,5 +1,5 @@
 import pytest
-from apple_container_mcp.tools import check_apiserver_status, run_container, stop_container, get_logs, active_builds, build_image, check_build_status
+from apple_container_mcp.tools import check_apiserver_status, run_container, stop_container, get_logs, active_builds, build_image, check_build_status, create_network, create_volume, prune_images
 from apple_container_mcp.cli_wrapper import ContainerCLIError
 
 def test_check_apiserver_status_running(mocker):
@@ -92,3 +92,21 @@ def test_build_image_async_behavior(mocker):
     # We won't block tests to test the active thread completion, but we verify it's registered
     last_build_id = list(active_builds.keys())[-1]
     assert check_build_status(last_build_id) == "In progress..."
+
+def test_create_network(mocker):
+    mock_cmd = mocker.patch("apple_container_mcp.tools._run_container_cmd")
+    result = create_network("my-net", subnet="192.168.1.0/24")
+    assert "Successfully created network 'my-net'" in result
+    mock_cmd.assert_called_once_with(["network", "create", "--subnet", "192.168.1.0/24", "my-net"])
+
+def test_create_volume(mocker):
+    mock_cmd = mocker.patch("apple_container_mcp.tools._run_container_cmd")
+    result = create_volume("my-vol", size="10G")
+    assert "Successfully created volume 'my-vol'" in result
+    mock_cmd.assert_called_once_with(["volume", "create", "-s", "10G", "my-vol"])
+
+def test_prune_images_all(mocker):
+    mock_cmd = mocker.patch("apple_container_mcp.tools._run_container_cmd")
+    result = prune_images(all=True)
+    assert "Successfully pruned unused images" in result
+    mock_cmd.assert_called_once_with(["image", "prune", "-a"])
