@@ -13,10 +13,9 @@ By acting as an MCP Server, this tool abstracts away the complexity of specific 
    ```bash
    brew install uv
    ```
-3. **Apple Container CLI**: Provided by Apple's virtualization framework. Ensure you have the background apiserver running before executing container workloads.
+3. **Apple Container CLI**: Provided by Apple's virtualization framework. Install via Homebrew, then start the system service:
    ```bash
-   # Assuming installation via typical Apple dev channels or homebrew if ported
-   brew install apple-container
+   brew install container
    container system start
    ```
 
