@@ -24,18 +24,29 @@ The solution is built as a Python-based MCP server using the FastMCP framework. 
 
 To ensure consistency, all tools will use a shared private method \_run\_container\_cmd(args).
 
-def _run_container_cmd(args: list[str]) -> dict:  
-    # Append --format json only for commands that support and require it  
-    no_format_commands = ["system", "logs", "run", "inspect", "rm", "stop", "kill", "pull", "build", "network", "volume", "prune", "image"]
+def _run_container_cmd(args: List[str]) -> Any:
     full_cmd = ["container"] + args
+    no_format_commands = ["system", "logs", "run", "inspect", "rm", "stop", "kill", "pull", "build", "network", "volume", "prune", "image"]
     if "--format" not in full_cmd and not (len(args) > 0 and args[0] in no_format_commands):
         full_cmd.extend(["--format", "json"])
-    try:  
-        process = subprocess.run(full_cmd, capture_output=True, text=True, check=True)  
-        # Handle empty responses, raw string responses, and JSON parsing
-        return json.loads(process.stdout)  
-    except subprocess.CalledProcessError as e:  
-        return {"error": e.stderr, "exit_code": e.returncode}
+
+    try:
+        process = subprocess.run(full_cmd, capture_output=True, text=True, check=True)
+        stdout = process.stdout.strip()
+        if not stdout:
+            return {}
+        try:
+            return json.loads(stdout)
+        except json.JSONDecodeError:
+            if args[0] in no_format_commands and args[0] != "inspect":
+                return {"raw_output": stdout}
+            return {"raw_output": stdout, "error": "Failed to parse JSON"}
+    except subprocess.CalledProcessError as e:
+        # Check for daemon connection issues
+        stderr_msg = e.stderr.strip().lower()
+        if "connection refused" in stderr_msg:
+             raise ContainerCLIError("Daemon not running", ...)
+        raise ContainerCLIError(f"Command failed", ...)
 
 ### **B. Tool Mapping Strategy**
 

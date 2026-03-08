@@ -30,7 +30,10 @@ def get_system_status_resource() -> str:
 
 @mcp.tool()
 def check_apiserver_status() -> Dict[str, Any]:
-    """Check if the Apple container-apiserver daemon is running."""
+    """
+    Check if the Apple container-apiserver daemon is running.
+    Returns a standardized dictionary with 'status' (ok/stopped/error).
+    """
     try:
         # system info expects to connect to the daemon
         _run_container_cmd(["system", "status"])
@@ -60,7 +63,10 @@ def stop_system() -> Dict[str, Any]:
 
 @mcp.tool()
 def system_status() -> Dict[str, Any]:
-    """Retrieve system-wide status (version, driver status)."""
+    """
+    Retrieve system-wide status (version, driver status).
+    Returns a dictionary containing 'status' and 'system_status'.
+    """
     try:
         result = _run_container_cmd(["system", "status"])
         return {"status": "ok", "system_status": result}

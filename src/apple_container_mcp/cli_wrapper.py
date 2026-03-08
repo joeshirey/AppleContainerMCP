@@ -26,9 +26,10 @@ def _run_container_cmd(args: List[str]) -> Any:
     """
     full_cmd = ["container"] + args
     
-    # Apple's `container` CLI is inconsistent with the `--format json` flag.
-    # We maintain an explicit list of commands that should *not* receive the flag
-    # because they either don't support it or we want raw output (e.g., logs).
+    # The `container` CLI is inconsistent with `--format json` support. 
+    # Some commands (like `logs` or `pull`) return streaming text that is not valid JSON.
+    # Others (like `system` or `run`) explicitly return plain text even if requested otherwise.
+    # We maintain a list of commands where we expect raw output or manage formatting manually.
     no_format_commands = ["system", "logs", "run", "inspect", "rm", "stop", "kill", "pull", "build", "network", "volume", "prune", "image"]
     if "--format" not in full_cmd and not (len(args) > 0 and args[0] in no_format_commands):
         full_cmd.extend(["--format", "json"])

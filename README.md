@@ -151,10 +151,16 @@ Once the MCP server is configured in your LLM client, you can use natural langua
 
 ---
 
-## 🛠 Active Capabilities (Tools Exposed)
+## 🛠 Active Capabilities
+
+### Tools Exposed
 
 - **System**: `check_apiserver_status`, `start_system`, `stop_system`, `system_status`
 - **Containers**: `run_container`, `list_containers`, `start_container`, `stop_container`, `remove_container`, `inspect_container`, `get_logs`, `prune_containers`
 - **Images**: `list_images`, `pull_image`, `build_image`, `check_build_status`, `remove_image`, `prune_images`
 - **Networks**: `create_network`, `remove_network`, `list_networks`, `inspect_network`, `prune_networks`
 - **Volumes**: `create_volume`, `remove_volume`, `list_volumes`, `inspect_volume`, `prune_volumes`
+
+### Resources Exposed
+
+- **System Status**: `apple-container://system/status`

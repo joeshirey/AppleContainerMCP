@@ -38,8 +38,9 @@ The MCP server must expose the following capabilities as "Tools":
 
 ### **FR2: Container Lifecycle**
 
-* **Run:** Start a container from an image with resource constraints, port forwarding, env variables, and volume mounts.  
+* **Run:** Start a container from an image with resource constraints, port forwarding, env variables, network, and volume mounts.  
 * **List:** View running and stopped containers.  
+* **Start:** Start a stopped container.
 * **Stop/Kill:** Gracefully or forcefully terminate containers.  
 * **Remove:** Clean up container resources.
 
