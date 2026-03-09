@@ -1,4 +1,4 @@
-from fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP
 from typing import Dict, Any, List, Optional
 import json
 import logging
