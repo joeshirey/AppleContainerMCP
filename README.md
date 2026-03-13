@@ -13,7 +13,7 @@ By acting as an MCP Server, this tool abstracts away the complexity of specific 
    ```bash
    brew install uv
    ```
-3. **Apple Container CLI**: Provided by Apple's virtualization framework. Install via Homebrew, then start the system service:
+3. **Apple Container CLI**: Provided by Apple's virtualization framework. Tested with **v0.10.0**. Install via Homebrew, then start the system service:
    ```bash
    brew install container
    container system start
@@ -251,7 +251,7 @@ Once the MCP server is configured in your LLM client, you can use natural langua
 ### Tools Exposed
 
 - **System**: `check_apiserver_status`, `start_system`, `stop_system`, `system_status`
-- **Containers**: `run_container`, `list_containers`, `start_container`, `stop_container`, `remove_container`, `inspect_container`, `get_logs`, `prune_containers`
+- **Containers**: `run_container` (supports `--init-image`), `list_containers`, `start_container`, `stop_container`, `remove_container`, `export_container`, `inspect_container`, `get_logs`, `prune_containers`
 - **Images**: `list_images`, `pull_image`, `build_image`, `check_build_status`, `remove_image`, `prune_images`
 - **Networks**: `create_network`, `remove_network`, `list_networks`, `inspect_network`, `prune_networks`
 - **Volumes**: `create_volume`, `remove_volume`, `list_volumes`, `inspect_volume`, `prune_volumes`

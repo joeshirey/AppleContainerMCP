@@ -53,7 +53,8 @@ def _run_container_cmd(args: List[str]) -> Any:
 | MCP Tool Name | CLI Command Equivalent | Logic Notes |
 | :---- | :---- | :---- |
 | list_containers | container ls -a | Parse JSON array, return count and names. |
-| run_container | container run ... | Map memory, cpus, ports, env, and volumes arguments to flags. |
+| run_container | container run ... | Map memory, cpus, ports, env, volumes, and init_image arguments to flags. |
+| export_container | container export ... | Export container state to an image. |
 | get_logs | container logs -n [limit] [id] | Use native `-n` flag instead of `--tail`. |
 | system_status | container system status | Check if daemon is active. |
 

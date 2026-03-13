@@ -96,10 +96,11 @@ def run_container(
     env: Optional[List[str]] = None,
     volumes: Optional[List[str]] = None,
     network: Optional[str] = None,
+    init_image: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Start a container from an image with optional resource constraints, networking, ports, env vars, and volume mounts.
-    Examples: run_container("debian", memory="4g", cpus=2, ports=["8080:8080"], env=["PORT=8080"], volumes=["/host/path:/container/path"], network="my_net")
+    Start a container from an image with optional resource constraints, networking, ports, env vars, volume mounts, and an optional init image.
+    Examples: run_container("debian", memory="4g", cpus=2, ports=["8080:8080"], env=["PORT=8080"], volumes=["/host/path:/container/path"], network="my_net", init_image="busybox")
     """
     # Lightweight input validation
     if ports:
@@ -137,6 +138,8 @@ def run_container(
     if volumes:
         for v in volumes:
             args.extend(["-v", v])
+    if init_image:
+        args.extend(["--init-image", init_image])
 
     args.append(image)
 
@@ -197,6 +200,20 @@ def remove_container(container_id: str, force: bool = False) -> Dict[str, Any]:
         return {"status": "ok", "message": f"Successfully removed container {container_id}."}
     except ContainerCLIError as e:
         return {"status": "error", "message": f"Failed to remove container {container_id}.", "details": e.stderr}
+
+
+@mcp.tool()
+def export_container(container_id: str, image: Optional[str] = None) -> Dict[str, Any]:
+    """Export a container state to an image."""
+    args = ["export"]
+    if image:
+        args.extend(["--image", image])
+    args.append(container_id)
+    try:
+        _run_container_cmd(args)
+        return {"status": "ok", "message": f"Successfully exported container {container_id}."}
+    except ContainerCLIError as e:
+        return {"status": "error", "message": f"Failed to export container {container_id}.", "details": e.stderr}
 
 
 # --- Image Management ---

@@ -10,6 +10,7 @@ from apple_container_mcp.tools import (
     create_network,
     create_volume,
     prune_images,
+    export_container,
 )
 from apple_container_mcp.cli_wrapper import ContainerCLIError
 
@@ -80,6 +81,26 @@ def test_run_container_with_options(mocker):
     )
 
 
+def test_run_container_with_init_image(mocker):
+    mock_cmd = mocker.patch("apple_container_mcp.tools._run_container_cmd")
+    mock_cmd.return_value = {"raw_output": "67890"}
+
+    result = run_container(
+        "ubuntu",
+        init_image="my-init-image",
+    )
+    assert result == {"status": "ok", "id": "67890"}
+    mock_cmd.assert_called_once_with(
+        [
+            "run",
+            "-d",
+            "--init-image",
+            "my-init-image",
+            "ubuntu",
+        ]
+    )
+
+
 def test_run_container_error(mocker):
     mock_cmd = mocker.patch("apple_container_mcp.tools._run_container_cmd")
     mock_cmd.side_effect = ContainerCLIError("Command failed", 125, "Image not found")
@@ -107,6 +128,14 @@ def test_stop_container_force(mocker):
     result = stop_container("12345", force=True)
     assert "Successfully executed 'kill' on container 12345." in result["message"]
     mock_cmd.assert_called_once_with(["kill", "12345"])
+
+
+def test_export_container(mocker):
+    mock_cmd = mocker.patch("apple_container_mcp.tools._run_container_cmd")
+    
+    result = export_container("12345", image="my-image")
+    assert "Successfully exported container 12345." in result["message"]
+    mock_cmd.assert_called_once_with(["export", "--image", "my-image", "12345"])
 
 
 def test_start_container(mocker):
