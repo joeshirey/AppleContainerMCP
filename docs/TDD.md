@@ -22,8 +22,9 @@ The solution is built as a Python-based MCP server using the FastMCP framework. 
 
 ### **A. The Execution Wrapper**
 
-To ensure consistency, all tools will use a shared private method \_run\_container\_cmd(args).
+To ensure consistency, all tools will use a shared private method `_run_container_cmd(args)`.
 
+```python
 def _run_container_cmd(args: List[str]) -> Any:
     full_cmd = ["container"] + args
     FORMAT_JSON_COMMANDS = {"ls"}
@@ -47,6 +48,7 @@ def _run_container_cmd(args: List[str]) -> Any:
         if "connection refused" in stderr_msg:
              raise ContainerCLIError("Daemon not running", ...)
         raise ContainerCLIError(f"Command failed", ...)
+```
 
 ### **B. Tool Mapping Strategy**
 
