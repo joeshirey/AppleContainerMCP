@@ -43,15 +43,23 @@ The MCP server must expose the following capabilities as "Tools":
 * **Start:** Start a stopped container.
 * **Stop/Kill:** Gracefully or forcefully terminate containers.  
 * **Remove:** Clean up container resources.
-* **Export:** Export a container state to an image.
+* **Export:** Export a container's filesystem as a tar archive (requires an output file path).
+* **Prune:** Remove stopped containers to reclaim disk space.
 
 ### **FR3: Image Management**
 
 * **Pull:** Download images from registries.  
-* **Build:** Build images from local contexts.  
+* **Build:** Build images from local contexts (supports tags and secrets).  
 * **List Images:** View available local images.
+* **Remove Image:** Delete a single image from local storage.
+* **Prune Images:** Remove unused or dangling images.
 
-### **FR4: Inspection & Logs**
+### **FR4: Network & Volume Management**
+
+* **Networks:** Create (with optional subnet and MTU), list, inspect, remove, and prune networks.
+* **Volumes:** Create (with optional size), list, inspect, remove, and prune volumes.
+
+### **FR5: Inspection & Logs**
 
 * **Logs:** Fetch recent stdout/stderr from a specific container.  
 * **Inspect:** Get detailed low-level configuration of a container.

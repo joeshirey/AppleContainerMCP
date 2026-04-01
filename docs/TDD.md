@@ -54,9 +54,13 @@ def _run_container_cmd(args: List[str]) -> Any:
 | :---- | :---- | :---- |
 | list_containers | container ls -a | Parse JSON array, return count and names. |
 | run_container | container run ... | Map memory, cpus, ports, env, volumes, and init_image arguments to flags. |
-| export_container | container export ... | Export container state to an image. |
+| export_container | container export -o [file] [id] | Export container filesystem as a tar archive (Requires output file in 0.11.0). |
+| build_image | container build ... | Build images asynchronously. Supports `--secret`. |
+| create_network | container network create | Supports `--subnet` and `--mtu`. |
+| create_volume | container volume create | Supports `-s` (size). |
 | get_logs | container logs -n [limit] [id] | Use native `-n` flag instead of `--tail`. |
 | system_status | container system status | Check if daemon is active. |
+| prune_* | container * prune | Clean up unused resources (containers, images, networks, volumes). |
 
 ## **4\. Error Handling & Edge Cases**
 

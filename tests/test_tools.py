@@ -133,9 +133,9 @@ def test_stop_container_force(mocker):
 def test_export_container(mocker):
     mock_cmd = mocker.patch("apple_container_mcp.tools._run_container_cmd")
     
-    result = export_container("12345", image="my-image")
-    assert "Successfully exported container 12345." in result["message"]
-    mock_cmd.assert_called_once_with(["export", "--image", "my-image", "12345"])
+    result = export_container("12345", output_file="my-file.tar")
+    assert "Successfully exported container 12345 to my-file.tar." in result["message"]
+    mock_cmd.assert_called_once_with(["export", "-o", "my-file.tar", "12345"])
 
 
 def test_start_container(mocker):
@@ -170,14 +170,12 @@ def test_build_image_async_behavior(mocker):
     mocker.patch("os.path.exists", return_value=True)
     mocker.patch("os.path.isdir", return_value=True)
 
-    # Reset globals for test isolation if needed, though they don't break logic
-    result = build_image(".")
+    result = build_image(".", secrets=["id=shh,src=secret.txt"])
 
     assert "Build started asynchronously" in result["message"]
     assert "build_" in result["message"]
     mock_thread_start.assert_called_once()
 
-    # We won't block tests to test the active thread completion, but we verify it's registered
     last_build_id = list(active_builds.keys())[-1]
     status_result = check_build_status(last_build_id)
     assert status_result["status"] == "ok"
@@ -189,6 +187,13 @@ def test_create_network(mocker):
     result = create_network("my-net", subnet="192.168.1.0/24")
     assert "Successfully created network 'my-net'" in result["message"]
     mock_cmd.assert_called_once_with(["network", "create", "--subnet", "192.168.1.0/24", "my-net"])
+
+
+def test_create_network_with_mtu(mocker):
+    mock_cmd = mocker.patch("apple_container_mcp.tools._run_container_cmd")
+    result = create_network("my-net", mtu=1500)
+    assert "Successfully created network 'my-net'" in result["message"]
+    mock_cmd.assert_called_once_with(["network", "create", "--mtu", "1500", "my-net"])
 
 
 def test_create_volume(mocker):

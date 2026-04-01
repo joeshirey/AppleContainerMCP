@@ -13,7 +13,7 @@ By acting as an MCP Server, this tool abstracts away the complexity of specific 
    ```bash
    brew install uv
    ```
-3. **Apple Container CLI**: Provided by Apple's virtualization framework. Tested with **v0.10.0**. Install via Homebrew, then start the system service:
+3. **Apple Container CLI**: Provided by Apple's virtualization framework. Tested with **v0.11.0**. Install via Homebrew, then start the system service:
    ```bash
    brew install container
    container system start

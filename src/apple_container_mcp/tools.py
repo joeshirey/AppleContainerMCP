@@ -203,15 +203,15 @@ def remove_container(container_id: str, force: bool = False) -> Dict[str, Any]:
 
 
 @mcp.tool()
-def export_container(container_id: str, image: Optional[str] = None) -> Dict[str, Any]:
-    """Export a container state to an image."""
-    args = ["export"]
-    if image:
-        args.extend(["--image", image])
-    args.append(container_id)
+def export_container(container_id: str, output_file: Optional[str] = None) -> Dict[str, Any]:
+    """Export a container's filesystem as a tar archive. Requires an output_file path in 0.11.0."""
+    if not output_file:
+        return {"status": "error", "message": "output_file is required in 0.11.0 to save the tar archive."}
+        
+    args = ["export", "-o", output_file, container_id]
     try:
         _run_container_cmd(args)
-        return {"status": "ok", "message": f"Successfully exported container {container_id}."}
+        return {"status": "ok", "message": f"Successfully exported container {container_id} to {output_file}."}
     except ContainerCLIError as e:
         return {"status": "error", "message": f"Failed to export container {container_id}.", "details": e.stderr}
 
@@ -230,15 +230,15 @@ def pull_image(image: str) -> Dict[str, Any]:
 
 
 # Thread-safe storage and counter for active builds.
-# active_builds: maps build_id to status strings.
-# _builds_lock: guards access to active_builds to prevent race conditions.
-# _build_id_counter: provides unique incrementing IDs for builds.
+# active_builds: maps unique build_id (str) to their current status/outcome (str).
+# _builds_lock: guards all access to active_builds to prevent race conditions during updates from background threads.
+# _build_id_counter: provides unique incrementing IDs for each asynchronous build operation.
 active_builds: Dict[str, str] = {}
 _builds_lock = threading.Lock()
 _build_id_counter = itertools.count()
 
 
-def _run_build_thread(build_id: str, context_path: str, tag: Optional[str] = None):
+def _run_build_thread(build_id: str, context_path: str, tag: Optional[str] = None, secrets: Optional[List[str]] = None):
     """
     Internal worker function executed in a background thread to run container builds.
     Updates the global active_builds dictionary with the outcome.
@@ -246,38 +246,47 @@ def _run_build_thread(build_id: str, context_path: str, tag: Optional[str] = Non
     args = ["build"]
     if tag:
         args.extend(["-t", tag])
+    if secrets:
+        for secret in secrets:
+            args.extend(["--secret", secret])
     args.append(context_path)
 
     try:
+        # Run the build command and parse result. Output might be JSON or raw.
         result = _run_container_cmd(args)
         with _builds_lock:
             active_builds[build_id] = f"Completed successfully. Output: {json.dumps(result)}"
     except ContainerCLIError as e:
+        # Log failure with CLI specific error details and return code.
         with _builds_lock:
             active_builds[build_id] = f"Failed with exit code {e.exit_code}. Error: {e.stderr}"
     except Exception as e:
+        # Catch-all for unexpected issues during the thread execution.
         with _builds_lock:
             active_builds[build_id] = f"Unexpected error during build: {str(e)}"
 
 
 @mcp.tool()
-def build_image(context_path: str, tag: Optional[str] = None) -> Dict[str, str]:
+def build_image(context_path: str, tag: Optional[str] = None, secrets: Optional[List[str]] = None) -> Dict[str, str]:
     """
     Build an image from a local context path.
     Runs asynchronously since builds can be long-running.
     Returns a build_id you can use to check status with check_build_status.
+    `secrets` is a list of secret specs, e.g., ["id=mysecret,src=secret.txt"].
     """
     if not os.path.exists(context_path):
         return {"status": "error", "message": f"Context path does not exist: {context_path}"}
     if not os.path.isdir(context_path):
         return {"status": "error", "message": f"Context path is not a directory: {context_path}"}
 
+    # Generate a unique ID and initialize state before launching the thread.
     build_id = f"build_{next(_build_id_counter)}"
 
     with _builds_lock:
         active_builds[build_id] = "In progress..."
 
-    thread = threading.Thread(target=_run_build_thread, args=(build_id, context_path, tag))
+    # Start build in daemon thread so it doesn't block the MCP server from shutting down if needed.
+    thread = threading.Thread(target=_run_build_thread, args=(build_id, context_path, tag, secrets))
     thread.daemon = True
     thread.start()
 
@@ -342,11 +351,13 @@ def inspect_container(container_id: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
-def create_network(name: str, subnet: Optional[str] = None) -> Dict[str, Any]:
-    """Creates a new network with the given name and optional subnet (e.g., 192.168.100.0/24)."""
+def create_network(name: str, subnet: Optional[str] = None, mtu: Optional[int] = None) -> Dict[str, Any]:
+    """Creates a new network with the given name, optional subnet, and optional MTU."""
     args = ["network", "create"]
     if subnet:
         args.extend(["--subnet", subnet])
+    if mtu:
+        args.extend(["--mtu", str(mtu)])
     args.append(name)
     try:
         _run_container_cmd(args)
