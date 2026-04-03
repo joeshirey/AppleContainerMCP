@@ -10,6 +10,7 @@ Thank you for your interest in contributing! This project is a bridge between MC
    - Apple's `container` service (and ensure `container system start` is run)
 
 2. **Clone and Install**:
+
    ```bash
    git clone https://github.com/joeshirey/AppleContainerMCP.git
    cd AppleContainerMCP
@@ -18,18 +19,21 @@ Thank you for your interest in contributing! This project is a bridge between MC
 
 3. **Running Tests**:
    We use `pytest` for unit testing.
+
    ```bash
    uv run pytest tests/
    ```
 
 4. **Linting**:
    We use `ruff` to maintain code quality.
+
    ```bash
    uv run ruff check src/
    ```
 
 5. **Local FastMCP Dev**:
    You can run the server in inspector mode (if available) or use our local sanity test:
+
    ```bash
    uv run test_local.py
    ```

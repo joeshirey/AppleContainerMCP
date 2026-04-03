@@ -132,7 +132,7 @@ def test_stop_container_force(mocker):
 
 def test_export_container(mocker):
     mock_cmd = mocker.patch("apple_container_mcp.tools._run_container_cmd")
-    
+
     result = export_container("12345", output_file="my-file.tar")
     assert "Successfully exported container 12345 to my-file.tar." in result["message"]
     mock_cmd.assert_called_once_with(["export", "-o", "my-file.tar", "12345"])

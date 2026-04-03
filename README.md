@@ -1,6 +1,6 @@
 # Apple Container MCP Server
 
-The **Apple Container MCP Server** is a bridge between the Model Context Protocol (MCP) and Apple's open-source `container` CLI. It enables developers to manage lightweight macOS-native containers seamlessly using natural language via LLM interfaces (like Claude, Cursor, Antigravity, and VSCode). 
+The **Apple Container MCP Server** is a bridge between the Model Context Protocol (MCP) and Apple's open-source `container` CLI. It enables developers to manage lightweight macOS-native containers seamlessly using natural language via LLM interfaces (like Claude, Cursor, Antigravity, and VSCode).
 
 By acting as an MCP Server, this tool abstracts away the complexity of specific CLI flags, networking mounts, and system-level configurations, letting the LLM inspect, analyze, and automatically run macOS container workflows on your behalf.
 
@@ -10,10 +10,13 @@ By acting as an MCP Server, this tool abstracts away the complexity of specific 
 
 1. **Python 3.11+** installed on your machine.
 2. **`uv` Package Manager**: Used for fast environment setup and execution.
+
    ```bash
    brew install uv
    ```
+
 3. **Apple Container CLI**: Provided by Apple's virtualization framework. Tested with **v0.11.0**. Install via Homebrew, then start the system service:
+
    ```bash
    brew install container
    container system start
@@ -28,14 +31,18 @@ You have two options for installing and running the Apple Container MCP server: 
 Both methods require adding the server to your preferred MCP Client's configuration file.
 
 ### Option A: Direct Execution via `uvx` (Recommended)
+
 This approach does not require cloning the repository. `uvx` will automatically fetch, sandbox, and run the latest version of the server. Ensure you have `uv` installed (`brew install uv`).
 
 ### Option B: Clone & Local Environment
-Use this approach if you want to inspect or modify the code locally. 
+
+Use this approach if you want to inspect or modify the code locally.
+
 ```bash
 git clone https://github.com/joeshirey/AppleContainerMCP.git
 cd AppleContainerMCP
 ```
+
 *Note: For Option B, you must replace `/path/to/uv` with your actual `uv` path (e.g. `/opt/homebrew/bin/uv`) and `/absolute/path/to/AppleContainerMCP` with the directory you cloned into.*
 
 ---
@@ -45,11 +52,13 @@ cd AppleContainerMCP
 Below are the specific instructions for adding the MCP server to major LLM tools. Use either the **Option A** or **Option B** snippet.
 
 #### 1. Antigravity (Google)
+
 *(For full details, see the [AntiGravity MCP install and configuration docs](https://goto.google.com/antigravity-mcp) or internal Google documentation).*
 
 Open your global MCP settings file (typically `~/.gemini/settings.json`) and add:
 
 **Option A (`uvx`):**
+
 ```json
 {
   "mcpServers": {
@@ -68,6 +77,7 @@ Open your global MCP settings file (typically `~/.gemini/settings.json`) and add
 ```
 
 **Option B (Clone):**
+
 ```json
 {
   "mcpServers": {
@@ -88,7 +98,9 @@ Open your global MCP settings file (typically `~/.gemini/settings.json`) and add
 ```
 
 #### 2. Cursor
+
 *(See the [Cursor MCP Documentation](https://docs.cursor.com/advanced/models-context-protocol) for more info).*
+
 1. Open Cursor Settings -> Features -> MCP
 2. Click **+ Add New MCP Server**
 3. Choose **command** type.
@@ -98,11 +110,13 @@ Open your global MCP settings file (typically `~/.gemini/settings.json`) and add
    - **Option B (Clone)**: `/usr/bin/env FASTMCP_SHOW_SERVER_BANNER=false /path/to/uv run --directory /absolute/path/to/AppleContainerMCP --quiet apple-container-mcp`
 
 #### 3. Claude Desktop
+
 *(See the [Official MCP Quickstart](https://modelcontextprotocol.io/quickstart/user) for full setup instructions).*
 
 Open the Claude Desktop configuration file (`~/Library/Application Support/Claude/claude_desktop_config.json`) and add:
 
 **Option A (`uvx`):**
+
 ```json
 {
   "mcpServers": {
@@ -121,6 +135,7 @@ Open the Claude Desktop configuration file (`~/Library/Application Support/Claud
 ```
 
 **Option B (Clone):**
+
 ```json
 {
   "mcpServers": {
@@ -139,14 +154,17 @@ Open the Claude Desktop configuration file (`~/Library/Application Support/Claud
   }
 }
 ```
+
 *(Restart Claude Desktop after updating).*
 
 #### 4. VSCode (via Cline / RooCode)
+
 *(See the [Cline MCP Documentation](https://github.com/cline/cline) for more details).*
 
 Open the extension MCP settings file (e.g., `~/.vscode/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`) and add:
 
 **Option A (`uvx`):**
+
 ```json
 {
   "mcpServers": {
@@ -165,6 +183,7 @@ Open the extension MCP settings file (e.g., `~/.vscode/globalStorage/saoudrizwan
 ```
 
 **Option B (Clone):**
+
 ```json
 {
   "mcpServers": {
@@ -185,11 +204,13 @@ Open the extension MCP settings file (e.g., `~/.vscode/globalStorage/saoudrizwan
 ```
 
 #### 5. Gemini CLI
+
 *(See the [Gemini CLI Documentation](https://github.com/google/gemini-cli) for setup details).*
 
 Open your Gemini CLI settings file (typically `~/.gemini/settings.json`) and add:
 
 **Option A (`uvx`):**
+
 ```json
 {
   "mcpServers": {
@@ -208,6 +229,7 @@ Open your Gemini CLI settings file (typically `~/.gemini/settings.json`) and add
 ```
 
 **Option B (Clone):**
+
 ```json
 {
   "mcpServers": {
