@@ -5,7 +5,7 @@ description = "Apple Container MCP Server: A bridge for managing macOS-native co
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "mcp>=1.2.0",
+    "mcp>=1.2.0,<2.0.0",
 ]
 
 [[tool.uv.index]]
@@ -26,7 +26,9 @@ packages = ["src/apple_container_mcp"]
 dev = [
     "pytest>=9.0.2",
     "pytest-mock>=3.15.1",
+    "pytest-cov>=6.0.0",
     "ruff>=0.15.5",
+    "mypy>=1.10.0",
 ]
 
 [tool.pytest.ini_options]
@@ -35,3 +37,10 @@ pythonpath = ["src"]
 [tool.ruff]
 target-version = "py311"
 line-length = 120
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
+ignore_missing_imports = true

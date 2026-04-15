@@ -56,13 +56,27 @@ def _run_container_cmd(args: List[str]) -> Any:
 | :---- | :---- | :---- |
 | list_containers | container ls -a | Parse JSON array, return count and names. |
 | run_container | container run ... | Map memory, cpus, ports, env, volumes, and init_image arguments to flags. |
+| exec_in_container | container exec ... | Run commands inside running containers. |
 | export_container | container export -o [file] [id] | Export container filesystem as a tar archive (Requires output file in 0.11.0). |
 | build_image | container build ... | Build images asynchronously. Supports `--secret`. |
+| check_build_status | N/A | Poll in-memory build status. |
+| tag_image | container image tag | Tag local images. |
+| push_image | container image push | Push images to registries. |
+| registry_login | container registry login | Authenticates with a registry via stdin. |
 | create_network | container network create | Supports `--subnet` and `--mtu`. |
 | create_volume | container volume create | Supports `-s` (size). |
 | get_logs | container logs -n [limit] [id] | Use native `-n` flag instead of `--tail`. |
 | system_status | container system status | Check if daemon is active. |
+| builder_status | container builder status | Check if image builder is active. |
 | prune_* | container * prune | Clean up unused resources (containers, images, networks, volumes). |
+
+### **C. Prompts (Guided Workflows)**
+
+The server implements several `mcp.prompt` handlers to guide users through complex tasks:
+- `troubleshoot_container`: Steps to debug a failing container.
+- `build_and_run_workflow`: Full lifecycle from local code to running container.
+- `cleanup_environment`: Guided cleanup of unused resources.
+- `setup_private_registry`: Authentication and image movement for private registries.
 
 ## **4\. Error Handling & Edge Cases**
 

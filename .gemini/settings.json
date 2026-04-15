@@ -4,7 +4,7 @@
       "command": "/usr/bin/env",
       "args": [
         "FASTMCP_SHOW_SERVER_BANNER=false",
-        "/opt/homebrew/bin/uv",
+        "uv",
         "run",
         "--quiet",
         "apple-container-mcp"

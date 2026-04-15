@@ -32,10 +32,10 @@ Thank you for your interest in contributing! This project is a bridge between MC
    ```
 
 5. **Local FastMCP Dev**:
-   You can run the server in inspector mode (if available) or use our local sanity test:
+   You can inspect the server interactively using the MCP inspector:
 
    ```bash
-   uv run test_local.py
+   uv run mcp dev src/apple_container_mcp/server.py
    ```
 
 ## Workflow

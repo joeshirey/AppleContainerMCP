@@ -12,14 +12,18 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Install uv
-      run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      uses: astral-sh/setup-uv@v5
+      with:
+        version: "0.6.x"
     - name: Set up Python
       run: uv python install 3.11
     - name: Install dependencies
       run: uv sync --dev
     - name: Run linting
-      run: uv run ruff check src/
+      run: uv run ruff check src/ tests/
     - name: Check formatting
-      run: uv run ruff format --check src/
-    - name: Run tests
-      run: uv run pytest tests/
+      run: uv run ruff format --check src/ tests/
+    - name: Run type checking
+      run: uv run mypy src/
+    - name: Run tests with coverage
+      run: uv run pytest tests/ --cov=apple_container_mcp --cov-report=term-missing

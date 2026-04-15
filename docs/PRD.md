@@ -53,6 +53,8 @@ The MCP server must expose the following capabilities as "Tools":
 * **List Images:** View available local images.
 * **Remove Image:** Delete a single image from local storage.
 * **Prune Images:** Remove unused or dangling images.
+* **Tag:** Tag a local image with a new name/tag.
+* **Push:** Push a local image to a container registry.
 
 ### **FR4: Network & Volume Management**
 
@@ -63,6 +65,19 @@ The MCP server must expose the following capabilities as "Tools":
 
 * **Logs:** Fetch recent stdout/stderr from a specific container.  
 * **Inspect:** Get detailed low-level configuration of a container.
+* **Exec:** Run a command inside a running container.
+
+### **FR6: Registry & Builder Management**
+
+* **Registry:** Login/Logout from container registries.
+* **Builder:** Start, stop, and check status of the image builder.
+
+### **FR7: Guided Workflows (Prompts)**
+
+* **Troubleshoot:** Guided workflow for failing containers.
+* **Build & Run:** Guided workflow for building and running local projects.
+* **Cleanup:** Guided workflow for environment cleanup.
+* **Registry Setup:** Guided workflow for private registry authentication.
 
 ## **6\. Non-Functional Requirements**
 
