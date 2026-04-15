@@ -24,7 +24,7 @@ packages = ["src/apple_container_mcp"]
 
 [dependency-groups]
 dev = [
-    "pytest>=9.0.2",
+    "pytest>=9.0.3",
     "pytest-mock>=3.15.1",
     "pytest-cov>=6.0.0",
     "ruff>=0.15.5",
