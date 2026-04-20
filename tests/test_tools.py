@@ -64,8 +64,25 @@ from apple_container_mcp.cli_wrapper import ContainerCLIError
 # ---------------------------------------------------------------------------
 
 
+_SUBMODULES_USING_RUN_CMD = [
+    "apple_container_mcp.tools.system",
+    "apple_container_mcp.tools.containers",
+    "apple_container_mcp.tools.images",
+    "apple_container_mcp.tools.networks",
+    "apple_container_mcp.tools.volumes",
+    "apple_container_mcp.tools.registry",
+    "apple_container_mcp.tools.builder",
+]
+
+
 def _mock_cmd(mocker):
-    return mocker.patch("apple_container_mcp.tools._run_container_cmd")
+    """Patch _run_container_cmd in every submodule so all tools see the same mock."""
+    from unittest.mock import MagicMock
+
+    shared = MagicMock()
+    for mod in _SUBMODULES_USING_RUN_CMD:
+        mocker.patch(f"{mod}._run_container_cmd", shared)
+    return shared
 
 
 # ---------------------------------------------------------------------------
@@ -907,7 +924,7 @@ def test_prune_volumes_error(mocker):
 
 
 def test_registry_login_success(mocker):
-    mock_run = mocker.patch("apple_container_mcp.tools.subprocess.run")
+    mock_run = mocker.patch("apple_container_mcp.tools.registry.subprocess.run")
     mock_proc = mocker.Mock()
     mock_proc.returncode = 0
     mock_proc.stderr = ""
@@ -927,7 +944,7 @@ def test_registry_login_success(mocker):
 
 
 def test_registry_login_failure(mocker):
-    mock_run = mocker.patch("apple_container_mcp.tools.subprocess.run")
+    mock_run = mocker.patch("apple_container_mcp.tools.registry.subprocess.run")
     mock_proc = mocker.Mock()
     mock_proc.returncode = 1
     mock_proc.stderr = "unauthorized: incorrect username or password"
@@ -941,7 +958,7 @@ def test_registry_login_failure(mocker):
 
 
 def test_registry_login_timeout(mocker):
-    mock_run = mocker.patch("apple_container_mcp.tools.subprocess.run")
+    mock_run = mocker.patch("apple_container_mcp.tools.registry.subprocess.run")
     mock_run.side_effect = subprocess.TimeoutExpired(cmd=["container"], timeout=30)
 
     result = registry_login("registry.example.com", "user", "pass")
@@ -951,7 +968,7 @@ def test_registry_login_timeout(mocker):
 
 
 def test_registry_login_cli_not_found(mocker):
-    mock_run = mocker.patch("apple_container_mcp.tools.subprocess.run")
+    mock_run = mocker.patch("apple_container_mcp.tools.registry.subprocess.run")
     mock_run.side_effect = FileNotFoundError
 
     result = registry_login("registry.example.com", "user", "pass")
