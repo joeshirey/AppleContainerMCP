@@ -23,6 +23,7 @@ from apple_container_mcp.tools import (
     check_build_status,
     list_builds,
     list_images,
+    pull_image,
     remove_image,
     prune_images,
     tag_image,
@@ -325,6 +326,15 @@ def test_export_container_no_output_file(mocker):
     assert "output_file is required" in result["message"]
 
 
+def test_export_container_error(mocker):
+    mock = _mock_cmd(mocker)
+    mock.side_effect = ContainerCLIError("failed", 1, "no such container")
+    result = export_container("bad-id", output_file="out.tar")
+    assert result["status"] == "error"
+    assert "Failed to export" in result["message"]
+    assert "no such container" in result["details"]
+
+
 def test_prune_containers(mocker):
     mock = _mock_cmd(mocker)
     result = prune_containers()
@@ -444,6 +454,23 @@ def test_list_images_error(mocker):
     mock.side_effect = ContainerCLIError("failed", 1, "daemon down")
     result = list_images()
     assert result["status"] == "error"
+
+
+def test_pull_image_ok(mocker):
+    mock = _mock_cmd(mocker)
+    mock.return_value = {}
+    result = pull_image("debian:latest")
+    assert result["status"] == "ok"
+    assert "debian:latest" in result["message"]
+    mock.assert_called_once_with(["image", "pull", "debian:latest"])
+
+
+def test_pull_image_error(mocker):
+    mock = _mock_cmd(mocker)
+    mock.side_effect = ContainerCLIError("failed", 1, "pull access denied")
+    result = pull_image("private/image:tag")
+    assert result["status"] == "error"
+    assert "pull access denied" in result["details"]
 
 
 def test_remove_image(mocker):
@@ -585,6 +612,17 @@ def test_build_image_path_traversal_blocked(mocker):
     assert "home directory" in result["message"]
 
 
+def test_build_image_path_traversal_sibling_prefix(mocker):
+    """Ensure /Users/tester doesn't pass the check when home is /Users/test."""
+    mocker.patch("os.path.exists", return_value=True)
+    mocker.patch("os.path.isdir", return_value=True)
+    mocker.patch("os.path.realpath", side_effect=lambda p: p)
+    mocker.patch("os.path.expanduser", return_value="/Users/test")
+    result = build_image("/Users/tester/evil")
+    assert result["status"] == "error"
+    assert "home directory" in result["message"]
+
+
 def test_check_build_status_not_found(mocker):
     result = check_build_status("build_nonexistent_xyz")
     assert result["status"] == "error"
@@ -603,7 +641,7 @@ def test_list_builds(mocker):
     build_image("/Users/test/proj")
     result = list_builds()
     assert result["status"] == "ok"
-    assert result["count"] >= 1
+    assert result["count"] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -649,6 +687,14 @@ def test_builder_stop(mocker):
     result = builder_stop()
     assert result["status"] == "ok"
     mock.assert_called_once_with(["builder", "stop"])
+
+
+def test_builder_stop_error(mocker):
+    mock = _mock_cmd(mocker)
+    mock.side_effect = ContainerCLIError("failed", 1, "builder not running")
+    result = builder_stop()
+    assert result["status"] == "error"
+    assert "builder not running" in result["details"]
 
 
 def test_builder_status(mocker):
@@ -1131,11 +1177,30 @@ def test_prompt_setup_private_registry():
 def test_run_container_with_env_file(mocker):
     mock = _mock_cmd(mocker)
     mock.return_value = {"raw_output": "abc"}
-    result = run_container("debian", env_file="/home/user/.env")
+    mocker.patch("os.path.expanduser", return_value="/Users/test")
+    mocker.patch("os.path.realpath", side_effect=lambda p: p)
+    result = run_container("debian", env_file="/Users/test/.env")
     assert result["status"] == "ok"
     called_args = mock.call_args[0][0]
     assert "--env-file" in called_args
-    assert "/home/user/.env" in called_args
+    assert "/Users/test/.env" in called_args
+
+
+def test_run_container_env_file_outside_home_blocked(mocker):
+    mocker.patch("os.path.expanduser", return_value="/Users/test")
+    mocker.patch("os.path.realpath", side_effect=lambda p: p)
+    result = run_container("debian", env_file="/etc/passwd")
+    assert result["status"] == "error"
+    assert "home directory" in result["message"]
+
+
+def test_run_container_env_file_sibling_prefix_blocked(mocker):
+    """Ensure /Users/tester/.env doesn't pass when home is /Users/test."""
+    mocker.patch("os.path.expanduser", return_value="/Users/test")
+    mocker.patch("os.path.realpath", side_effect=lambda p: p)
+    result = run_container("debian", env_file="/Users/tester/.env")
+    assert result["status"] == "error"
+    assert "home directory" in result["message"]
 
 
 def test_run_container_with_mount(mocker):

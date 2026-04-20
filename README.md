@@ -273,10 +273,19 @@ Once the MCP server is configured in your LLM client, you can use natural langua
 ### Tools Exposed
 
 - **System**: `check_apiserver_status`, `start_system`, `stop_system`, `system_status`
-- **Containers**: `run_container` (supports `--init-image`), `list_containers`, `start_container`, `stop_container`, `remove_container`, `export_container`, `inspect_container`, `get_logs`, `prune_containers`
-- **Images**: `list_images`, `pull_image`, `build_image`, `check_build_status`, `remove_image`, `prune_images`
+- **Containers**: `run_container` (supports `--init-image`, rosetta, platform, labels, and more), `list_containers`, `start_container`, `stop_container`, `remove_container`, `export_container`, `inspect_container`, `exec_in_container`, `get_logs`, `prune_containers`
+- **Images**: `list_images`, `pull_image`, `build_image`, `check_build_status`, `list_builds`, `tag_image`, `push_image`, `inspect_image`, `remove_image`, `prune_images`
 - **Networks**: `create_network`, `remove_network`, `list_networks`, `inspect_network`, `prune_networks`
 - **Volumes**: `create_volume`, `remove_volume`, `list_volumes`, `inspect_volume`, `prune_volumes`
+- **Registry**: `registry_login`, `registry_logout`
+- **Builder**: `builder_start`, `builder_stop`, `builder_status`
+
+### Prompts Exposed
+
+- **`troubleshoot_container`**: Guided workflow to inspect and debug a failing container.
+- **`build_and_run_workflow`**: Step-by-step guide to build an image from a local project and run it.
+- **`cleanup_environment`**: Safely review and prune stopped containers, unused images, volumes, and networks.
+- **`setup_private_registry`**: Walk through authenticating with a private container registry.
 
 ### Resources Exposed
 

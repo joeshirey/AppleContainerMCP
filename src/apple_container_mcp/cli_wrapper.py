@@ -1,6 +1,9 @@
 import json
+import logging
 import subprocess
 from typing import Any, List, Optional
+
+logger = logging.getLogger("apple-container-mcp")
 
 
 class ContainerCLIError(Exception):
@@ -77,6 +80,8 @@ def _run_container_cmd(args: List[str], timeout: Optional[int] = None) -> Any:
             LONG_RUNNING_TIMEOUT_SECONDS if any(a in LONG_RUNNING_COMMANDS for a in args) else DEFAULT_TIMEOUT_SECONDS
         )
 
+    logger.debug("Executing: %s (timeout=%ss)", " ".join(full_cmd), timeout)
+
     try:
         # Execute the command and capture output.
         process = subprocess.run(full_cmd, capture_output=True, text=True, check=True, timeout=timeout)
@@ -97,6 +102,7 @@ def _run_container_cmd(args: List[str], timeout: Optional[int] = None) -> Any:
                 return {"raw_output": stdout, "error": "Failed to parse JSON output"}
             return {"raw_output": stdout}
     except subprocess.TimeoutExpired as e:
+        logger.error("Command timed out after %ss: %s", timeout, " ".join(full_cmd))
         # Re-raise as a domain-specific error with the command context.
         raise ContainerCLIError(
             f"Command timed out after {timeout}s: {' '.join(full_cmd)}",
@@ -104,6 +110,7 @@ def _run_container_cmd(args: List[str], timeout: Optional[int] = None) -> Any:
             f"Timed out after {timeout} seconds.",
         ) from e
     except subprocess.CalledProcessError as e:
+        logger.warning("Command failed (exit %d): %s — %s", e.returncode, " ".join(full_cmd), e.stderr.strip())
         # Detect and normalize 'daemon not running' errors which often have specific stderr signatures.
         stderr_msg = e.stderr.strip().lower()
         if "connection refused" in stderr_msg or "cannot connect to the container daemon" in stderr_msg:

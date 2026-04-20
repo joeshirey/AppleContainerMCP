@@ -171,6 +171,17 @@ def run_container(
             if ":" not in v:
                 return {"status": "error", "message": f"Invalid volume format: {v}. Expected 'HOST:CONTAINER'."}
 
+    # Restrict env_file to paths within the user's home directory to prevent
+    # an LLM (or prompt injection) from reading arbitrary system files.
+    if env_file:
+        home_real = os.path.realpath(os.path.expanduser("~"))
+        env_file_real = os.path.realpath(env_file)
+        if not (env_file_real == home_real or env_file_real.startswith(home_real + os.sep)):
+            return {
+                "status": "error",
+                "message": f"env_file must be within your home directory ({home_real}).",
+            }
+
     cmd_args = ["run"]
     if detach:
         cmd_args.append("-d")
@@ -423,9 +434,11 @@ def build_image(
         return {"status": "error", "message": f"Context path is not a directory: {context_path}"}
 
     # Boundary check: only allow paths within the user's home directory.
+    # Use os.sep suffix to prevent prefix-match bypasses (e.g. /Users/joe vs /Users/joey).
     home = os.path.expanduser("~")
     real_path = os.path.realpath(context_path)
-    if not real_path.startswith(os.path.realpath(home)):
+    home_real = os.path.realpath(home)
+    if not (real_path == home_real or real_path.startswith(home_real + os.sep)):
         return {"status": "error", "message": f"context_path must be within your home directory ({home})."}
 
     # Generate a unique ID and initialise state before launching the thread.
@@ -891,7 +904,7 @@ def cleanup_environment() -> str:
 
 Please follow these steps carefully — cleanup operations are irreversible:
 
-1. Call `list_containers(all=True)` to see all containers including stopped ones.
+1. Call `list_containers(include_stopped=True)` to see all containers including stopped ones.
    - Identify which stopped containers can be safely removed.
 2. Call `list_images()` to see all local images.
    - Note which images are not referenced by any container.
@@ -899,7 +912,7 @@ Please follow these steps carefully — cleanup operations are irreversible:
 4. Ask the user to confirm before running any prune operations.
 5. With confirmation, run:
    - `prune_containers()` to remove stopped containers.
-   - `prune_images()` (or `prune_images(all=True)`) to remove unused images.
+   - `prune_images()` (or `prune_images(remove_all=True)`) to remove unused images.
    - `prune_volumes()` only if the user explicitly confirms all orphaned volumes can be deleted.
    - `prune_networks()` to remove unused networks.
 6. Run `list_containers()`, `list_images()`, `list_volumes()` again to confirm the cleanup.
