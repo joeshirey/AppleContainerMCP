@@ -425,11 +425,11 @@ def test_stats_container_all(mocker):
     assert called_args == ["stats", "--no-stream"]
 
 
-def test_stats_container_specific(mocker):
-    """When called with a container ID, returns stats for that one container."""
+def test_stats_container_single_in_list(mocker):
+    """When called with a single-element list, returns stats for that one container."""
     mock = _mock_cmd(mocker)
     mock.return_value = [{"id": "abc", "cpu": "0.5%", "memory": "100MB"}]
-    result = stats_container("abc")
+    result = stats_container(["abc"])
     assert result["status"] == "ok"
     called_args = mock.call_args[0][0]
     assert called_args == ["stats", "--no-stream", "abc"]

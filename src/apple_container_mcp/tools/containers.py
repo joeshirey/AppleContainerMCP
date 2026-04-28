@@ -1,7 +1,7 @@
 """Container lifecycle tools: run, list, start, stop, remove, export, exec, logs, inspect, prune."""
 
 import os
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional
 
 from . import mcp, _DESTRUCTIVE, _DANGEROUS_FLAGS, _normalize_list_result, _run_container_cmd, ContainerCLIError
 
@@ -285,7 +285,7 @@ def prune_containers() -> Dict[str, Any]:
 
 
 @mcp.tool()
-def stats_container(containers: Optional[Union[str, List[str]]] = None) -> Dict[str, Any]:
+def stats_container(containers: Optional[List[str]] = None) -> Dict[str, Any]:
     """
     Get a one-shot resource-usage snapshot for one or more containers.
 
@@ -297,10 +297,11 @@ def stats_container(containers: Optional[Union[str, List[str]]] = None) -> Dict[
     `container stats` CLI directly.
 
     Args:
-        containers: Optional container selector.
+        containers: Optional list of container IDs or names.
             - None or empty list: return stats for ALL running containers.
-            - str: return stats for a single container by ID or name.
-            - List[str]: return stats for the named containers.
+            - Non-empty list: return stats for the named containers.
+
+            For a single container, pass a single-element list, e.g. ["abc"].
 
     Returns:
         On success: {"status": "ok", "stats": <list of per-container stats>}
@@ -309,11 +310,7 @@ def stats_container(containers: Optional[Union[str, List[str]]] = None) -> Dict[
     """
     args = ["stats", "--no-stream"]
     if containers:
-        if isinstance(containers, str):
-            args.append(containers)
-        else:
-            # List[str] — extend with each ID
-            args.extend(containers)
+        args.extend(containers)
     try:
         result = _run_container_cmd(args)
         return {"status": "ok", "stats": result}
