@@ -63,7 +63,13 @@ def _run_container_cmd(args: List[str], timeout: Optional[int] = None) -> Any:
         ("image", "ls"),  # container image ls
         ("network", "ls"),  # container network ls
         ("volume", "ls"),  # container volume ls
-        ("builder", "ls"),  # container builder ls (if supported)
+        # `container builder ls` does NOT exist in Apple Container 0.12
+        # (verified in 2026-04-28 CLI audit). Builder subcommands are only
+        # start / status / stop / delete. Do NOT re-add this entry.
+        ("system", "version"),  # container system version (added in 0.12)
+        ("system", "status"),  # container system status (verified in 0.12)
+        ("builder", "status"),  # container builder status (verified in 0.12)
+        ("stats",),  # container stats (verified in 0.12)
     }
     leading = tuple(args)
     # Check if the start of the current command matches any entry in our JSON-capable allowlist.

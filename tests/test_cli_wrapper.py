@@ -146,3 +146,44 @@ def test_run_container_cmd_subcommand_ls_gets_json_format(mocker):
         called_cmd = mock_run.call_args[0][0]
         assert "--format" in called_cmd, f"--format missing for {subcmd}"
         assert "json" in called_cmd, f"json missing for {subcmd}"
+
+
+@pytest.mark.parametrize("subcmd", [
+    ["system", "version"],
+    ["system", "status"],
+    ["builder", "status"],
+    ["stats"],
+])
+def test_run_container_cmd_new_allowlist_entries_get_json_format(mocker, subcmd):
+    """Verify each newly allowlisted command (per Apple Container 0.12 audit) receives --format json."""
+    mock_run = mocker.patch("subprocess.run")
+    mock_result = mocker.Mock()
+    mock_result.stdout = "{}"
+    mock_result.returncode = 0
+    mock_run.return_value = mock_result
+
+    _run_container_cmd(subcmd)
+
+    called_cmd = mock_run.call_args[0][0]
+    assert "--format" in called_cmd, f"--format missing for {subcmd}"
+    assert "json" in called_cmd, f"json missing for {subcmd}"
+
+
+def test_run_container_cmd_builder_ls_no_longer_in_allowlist(mocker):
+    """`container builder ls` does NOT exist in 0.12; the dead entry must have been removed.
+
+    This test asserts that when ['builder', 'ls'] is passed to _run_container_cmd,
+    --format json is NOT auto-appended (because the entry was removed from the
+    allowlist). This guards against accidentally re-adding it.
+    """
+    mock_run = mocker.patch("subprocess.run")
+    mock_result = mocker.Mock()
+    mock_result.stdout = ""
+    mock_result.returncode = 0
+    mock_run.return_value = mock_result
+
+    _run_container_cmd(["builder", "ls"])
+
+    called_cmd = mock_run.call_args[0][0]
+    # --format json must NOT have been auto-appended (entry was removed from allowlist)
+    assert "--format" not in called_cmd, "builder ls should not auto-receive --format json"
