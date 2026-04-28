@@ -182,9 +182,9 @@ def remove_container(container_id: str, force: bool = False) -> Dict[str, Any]:
 
 @mcp.tool()
 def export_container(container_id: str, output_file: Optional[str] = None) -> Dict[str, Any]:
-    """Export a container's filesystem as a tar archive. Requires an output_file path in 0.11.0."""
+    """Export a container's filesystem as a tar archive (OCI layout). Requires an output_file path."""
     if not output_file:
-        return {"status": "error", "message": "output_file is required in 0.11.0 to save the tar archive."}
+        return {"status": "error", "message": "output_file is required to save the tar archive."}
 
     args = ["export", "-o", output_file, container_id]
     try:

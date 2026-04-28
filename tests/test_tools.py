@@ -341,6 +341,8 @@ def test_export_container_no_output_file(mocker):
     result = export_container("12345")
     assert result["status"] == "error"
     assert "output_file is required" in result["message"]
+    # Should not reference any specific Apple Container CLI version
+    assert "0.11.0" not in result["message"]
 
 
 def test_export_container_error(mocker):
