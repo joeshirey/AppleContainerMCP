@@ -6,6 +6,7 @@ from apple_container_mcp.tools import (
     start_system,
     stop_system,
     system_status,
+    system_version,
     # container lifecycle
     run_container,
     list_containers,
@@ -150,6 +151,45 @@ def test_stop_system_error(mocker):
     mock.side_effect = ContainerCLIError("failed", 1, "not running")
     result = stop_system()
     assert result["status"] == "error"
+
+
+def test_system_version_ok_with_daemon_up(mocker):
+    """When the daemon is running, the CLI returns both CLI + apiserver entries."""
+    mock = _mock_cmd(mocker)
+    mock.return_value = [
+        {"appName": "container", "buildType": "release", "version": "0.12.0", "commit": "unspecified"},
+        {"appName": "container-apiserver", "buildType": "release", "version": "0.12.0", "commit": "unspecified"},
+    ]
+    result = system_version()
+    assert result["status"] == "ok"
+    # Output is a list (array), not a dict
+    assert isinstance(result["version"], list)
+    assert len(result["version"]) == 2
+    assert result["version"][0]["appName"] == "container"
+    assert result["version"][1]["appName"] == "container-apiserver"
+    mock.assert_called_once_with(["system", "version"])
+
+
+def test_system_version_ok_with_daemon_down(mocker):
+    """When the daemon is down, the CLI still returns its own version entry."""
+    mock = _mock_cmd(mocker)
+    mock.return_value = [
+        {"appName": "container", "buildType": "release", "version": "0.12.0", "commit": "unspecified"},
+    ]
+    result = system_version()
+    assert result["status"] == "ok"
+    assert isinstance(result["version"], list)
+    assert len(result["version"]) == 1
+    assert result["version"][0]["appName"] == "container"
+
+
+def test_system_version_error(mocker):
+    """If the CLI itself fails (e.g. binary missing or unknown subcommand), return a structured error."""
+    mock = _mock_cmd(mocker)
+    mock.side_effect = ContainerCLIError("failed", 1, "unknown subcommand")
+    result = system_version()
+    assert result["status"] == "error"
+    assert "Failed to retrieve" in result["message"]
 
 
 # ---------------------------------------------------------------------------

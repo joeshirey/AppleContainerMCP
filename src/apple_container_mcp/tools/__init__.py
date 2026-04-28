@@ -103,6 +103,7 @@ from .system import (  # noqa: E402, F401
     start_system,
     stop_system,
     system_status,
+    system_version,
 )
 from .containers import (  # noqa: E402, F401
     run_container,
