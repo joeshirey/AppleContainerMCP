@@ -1,6 +1,6 @@
 [project]
 name = "applecontainermcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "Apple Container MCP Server: A bridge for managing macOS-native containers via natural language."
 readme = "README.md"
 requires-python = ">=3.11"
