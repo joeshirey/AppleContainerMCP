@@ -148,12 +148,15 @@ def test_run_container_cmd_subcommand_ls_gets_json_format(mocker):
         assert "json" in called_cmd, f"json missing for {subcmd}"
 
 
-@pytest.mark.parametrize("subcmd", [
-    ["system", "version"],
-    ["system", "status"],
-    ["builder", "status"],
-    ["stats"],
-])
+@pytest.mark.parametrize(
+    "subcmd",
+    [
+        ["system", "version"],
+        ["system", "status"],
+        ["builder", "status"],
+        ["stats"],
+    ],
+)
 def test_run_container_cmd_new_allowlist_entries_get_json_format(mocker, subcmd):
     """Verify each newly allowlisted command (per Apple Container 0.12 audit) receives --format json."""
     mock_run = mocker.patch("subprocess.run")
