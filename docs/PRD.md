@@ -35,6 +35,7 @@ The MCP server must expose the following capabilities as "Tools":
 * Check if container-apiserver is running.  
 * Start/Stop the system service.  
 * Retrieve system-wide info (version, driver status).
+* Retrieve detailed version information for the CLI and apiserver daemon (works without the daemon running; useful as a lightweight environment probe). Requires Apple Container 0.12+.
 
 ### **FR2: Container Lifecycle**
 
@@ -66,6 +67,7 @@ The MCP server must expose the following capabilities as "Tools":
 * **Logs:** Fetch recent stdout/stderr from a specific container.  
 * **Inspect:** Get detailed low-level configuration of a container.
 * **Exec:** Run a command inside a running container.
+* **Stats:** Get a one-shot resource-usage snapshot for one or more containers (always non-streaming to fit the request/response model). Requires Apple Container 0.12+.
 
 ### **FR6: Registry & Builder Management**
 
