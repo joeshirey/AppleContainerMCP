@@ -40,7 +40,12 @@ def _run_container_cmd(args: List[str], timeout: Optional[int] = None) -> Any:
 
     FORMAT_JSON_COMMANDS = {
         ("ls",), ("image", "ls"), ("network", "ls"),
-        ("volume", "ls"), ("builder", "ls"),
+        ("volume", "ls"),
+        # Added in Apple Container 0.12 support update:
+        ("system", "version"), ("system", "status"),
+        ("builder", "status"), ("stats",),
+        # Note: ("builder", "ls") was removed — that subcommand
+        # does not exist in 0.12 (audit-verified).
     }
     leading = tuple(args)
     matches_allowlist = any(leading[:len(prefix)] == prefix for prefix in FORMAT_JSON_COMMANDS)
@@ -83,7 +88,7 @@ def _run_container_cmd(args: List[str], timeout: Optional[int] = None) -> Any:
 | list_containers | container ls -a | Parse JSON array, return count and names. |
 | run_container | container run ... | Map memory, cpus, ports, env, volumes, and init_image arguments to flags. |
 | exec_in_container | container exec ... | Run commands inside running containers. |
-| export_container | container export -o [file] [id] | Export container filesystem as a tar archive (Requires output file in 0.11.0). |
+| export_container | container export -o [file] [id] | Export container filesystem as an OCI-layout tar archive. |
 | build_image | container build ... | Build images asynchronously. Supports `--secret`. |
 | check_build_status | N/A | Poll in-memory build status. |
 | tag_image | container image tag | Tag local images. |
@@ -95,6 +100,8 @@ def _run_container_cmd(args: List[str], timeout: Optional[int] = None) -> Any:
 | system_status | container system status | Check if daemon is active. |
 | builder_status | container builder status | Check if image builder is active. |
 | prune_* | container * prune | Clean up unused resources (containers, images, networks, volumes). |
+| system_version | container system version | Returns CLI/apiserver versions as JSON. Works without the daemon. (Apple Container 0.12+) |
+| stats_container | container stats --no-stream [containers...] | One-shot resource-usage snapshot. Always non-streaming. (Apple Container 0.12+) |
 
 ### **C. Prompts (Guided Workflows)**
 
@@ -120,7 +127,8 @@ The server implements several `mcp.prompt` handlers to guide users through compl
 
 * **Local Execution:** The MCP server only accepts requests from the local MCP Host.  
 * **Path Validation:** `build_image` validates that `context_path` is within the user's home directory using `os.path.realpath` with a trailing `os.sep` check to prevent prefix-match bypasses (e.g. `/Users/joe` vs `/Users/joey`). The same guard is applied to `env_file` in `run_container`.  
-* **Argument Sanitization:** `subprocess.run` is called with a list of arguments (never `shell=True`) to prevent shell injection. Additionally, `run_container`'s `args_override` parameter is validated against a blocklist of dangerous flags (`--privileged`, `--cap-add`, `--security-opt`, `--device`, etc.) to prevent privilege escalation via LLM prompt injection.  
+* **Argument Sanitization:** `subprocess.run` is called with a list of arguments (never `shell=True`) to prevent shell injection. `run_container`'s `args_override` parameter is validated against a blocklist of dangerous flags to prevent privilege escalation, capability grants, and credential exposure via LLM prompt injection. The current blocklist: `--privileged`, `--cap-add`, `--cap-drop`, `--security-opt`, `--device`, `--pid`, `--ipc`, `--userns`, `--cgroupns`, `--no-new-privileges`, `--kernel` / `-k`, `--ssh`.
+* **Capabilities and 0.12 audit additions:** Apple Container 0.12 promoted `--cap-add` / `--cap-drop` to documented public flags. This MCP deliberately keeps them in the blocklist and does NOT expose them as tool parameters. The 0.12 CLI audit also surfaced `--kernel` / `-k` (arbitrary host kernel-image path injection) and `--ssh` (host SSH-agent socket forwarding); both have been added to the blocklist for the same reasons.  
 * **Credential Handling:** `registry_login` passes the password via `stdin` to avoid exposing it in process arguments.
 
 ## **6\. Deployment Plan**
