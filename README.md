@@ -15,7 +15,7 @@ By acting as an MCP Server, this tool abstracts away the complexity of specific 
    brew install uv
    ```
 
-3. **Apple Container CLI**: Provided by Apple's virtualization framework. Tested with **v0.11.0**. Install via Homebrew, then start the system service:
+3. **Apple Container CLI**: Provided by Apple's virtualization framework. **Requires v0.12.0 or later.** Install via Homebrew, then start the system service:
 
    ```bash
    brew install container
@@ -272,8 +272,8 @@ Once the MCP server is configured in your LLM client, you can use natural langua
 
 ### Tools Exposed
 
-- **System**: `check_apiserver_status`, `start_system`, `stop_system`, `system_status`
-- **Containers**: `run_container` (supports `--init-image`, rosetta, platform, labels, and more), `list_containers`, `start_container`, `stop_container`, `remove_container`, `export_container`, `inspect_container`, `exec_in_container`, `get_logs`, `prune_containers`
+- **System**: `check_apiserver_status`, `start_system`, `stop_system`, `system_status`, `system_version`
+- **Containers**: `run_container` (supports `--init-image`, rosetta, platform, labels, and more), `list_containers`, `start_container`, `stop_container`, `remove_container`, `export_container`, `inspect_container`, `exec_in_container`, `get_logs`, `prune_containers`, `stats_container`
 - **Images**: `list_images`, `pull_image`, `build_image`, `check_build_status`, `list_builds`, `tag_image`, `push_image`, `inspect_image`, `remove_image`, `prune_images`
 - **Networks**: `create_network`, `remove_network`, `list_networks`, `inspect_network`, `prune_networks`
 - **Volumes**: `create_volume`, `remove_volume`, `list_volumes`, `inspect_volume`, `prune_volumes`
@@ -290,3 +290,16 @@ Once the MCP server is configured in your LLM client, you can use natural langua
 ### Resources Exposed
 
 - **System Status**: `apple-container://system/status`
+
+---
+
+## 🔒 Security Model
+
+This server applies several deliberate restrictions to keep LLM-driven container operations safe:
+
+- **Path validation:** `build_image`'s `context_path` and `run_container`'s `env_file` are restricted to paths inside your home directory. The check uses `os.path.realpath` and a trailing-separator suffix test to prevent prefix-match bypasses (e.g. `/Users/joe` vs `/Users/joey`).
+- **Argument blocklist:** `run_container`'s `args_override` parameter rejects flags that escalate privilege, weaken isolation, or expose host credentials: `--privileged`, `--cap-add`, `--cap-drop`, `--security-opt`, `--device`, `--pid`, `--ipc`, `--userns`, `--cgroupns`, `--no-new-privileges`, `--kernel` / `-k`, `--ssh`.
+- **Linux capabilities (Apple Container 0.12+):** Container 0.12 promoted `--cap-add` / `--cap-drop` to documented public flags. **This MCP deliberately does NOT expose them as tool parameters.** Capability selection meaningfully weakens process isolation; if you need it, invoke `container run` directly. We may revisit this in a future release with an allowlist mechanism.
+- **`--kernel` and `--ssh` blocked:** `--kernel` (which loads an arbitrary host filesystem path as a guest kernel) is a privilege-escalation vector; `--ssh` (which forwards the host SSH agent socket into the container) is a credential-leak vector. Both are blocked from `args_override`.
+- **No shell injection:** `subprocess.run` is always called with an argument list, never with `shell=True`.
+- **Credential handling:** `registry_login` passes the password via `stdin` (`--password-stdin`) so it never appears in process arguments.
