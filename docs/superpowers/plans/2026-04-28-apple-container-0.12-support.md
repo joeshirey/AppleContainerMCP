@@ -12,6 +12,26 @@
 
 ---
 
+## Plan Revisions (post-audit, 2026-04-28)
+
+The Task 1 audit (`docs/superpowers/plans/2026-04-28-cli-audit-results.md`) revealed several discrepancies between the original spec assumptions and the actual 0.12.0 CLI. The following revisions were approved by the spec owner and supersede the original task content below:
+
+| Task | Original | Revised |
+|---|---|---|
+| **4** | Document capabilities policy + `--cap-drop` regression test | Same, PLUS add `--kernel`/`-k` and `--ssh` to `_DANGEROUS_FLAGS` with regression tests. `--runtime` and `--init-image` are deliberately NOT added (init-image is exposed as a typed parameter; runtime has legitimate workflow use). |
+| **5** | Add `("system", "version")` and other audit-confirmed tuples | Add `("system", "version")`, `("system", "status")`, `("builder", "status")`, `("stats",)`. **Remove** `("builder", "ls")` — that subcommand does NOT exist in 0.12 (it's dead code). |
+| **6** | Implement `system_version` | Same. Audit confirmed it works WITHOUT the daemon — docstring should call this out explicitly. Output is a JSON **array** (not object) with elements having keys `appName`, `buildType`, `version`, `commit`. |
+| **7** | Add `journal: bool` to `create_volume` | **DROPPED.** The `--journal` flag does NOT exist as a public option in 0.12.0 (`container volume create --help` shows only `--label`, `--opt`, `-s`, `--debug`). Skip this task entirely. CHANGELOG should note "investigated and deferred". |
+| **8** | Implement gap-fill tools (8a-8h: restart, pause, unpause, rename, stats, events, history; cp deferred) | **Only `stats_container` (8e) is implemented.** All others (8a-8d, 8f, 8g, 8h) DROPPED — those subcommands don't exist in 0.12 (each returns `Plugin '<name>' not found`). The `stats_container` invocation form is `container stats --no-stream --format json [<container> ...]`. |
+| **10** | Update README tools list | Trim list per Task 8 revision (only `stats_container` added). Drop `journal` mention from `create_volume`. Add `--kernel` and `--ssh` to the args_override blocklist mention. |
+| **11** | Update PRD | Same trimming. |
+| **12** | Update TDD | Same trimming + reflect new dangerous flags. |
+| **13** | CHANGELOG | Add explicit note: "Investigated `--journal` for `create_volume` and gap-fill subcommands (`restart`, `pause`, `unpause`, `events`, `rename`, `cp`, `history`); none exist in 0.12.0 \u2014 deferred to future releases." |
+
+**Tasks unaffected by revisions:** 1 (already done), 2, 3, 9, 14.
+
+---
+
 ## Task 1: CLI verification audit
 
 The audit results drive Tasks 5, 6, 7, and 8. Run the installed `container 0.12` CLI and record outputs in an audit document that subsequent tasks consume.

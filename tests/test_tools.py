@@ -6,6 +6,7 @@ from apple_container_mcp.tools import (
     start_system,
     stop_system,
     system_status,
+    system_version,
     # container lifecycle
     run_container,
     list_containers,
@@ -14,6 +15,7 @@ from apple_container_mcp.tools import (
     remove_container,
     export_container,
     prune_containers,
+    stats_container,
     # exec & logs & inspect
     exec_in_container,
     get_logs,
@@ -150,6 +152,45 @@ def test_stop_system_error(mocker):
     mock.side_effect = ContainerCLIError("failed", 1, "not running")
     result = stop_system()
     assert result["status"] == "error"
+
+
+def test_system_version_ok_with_daemon_up(mocker):
+    """When the daemon is running, the CLI returns both CLI + apiserver entries."""
+    mock = _mock_cmd(mocker)
+    mock.return_value = [
+        {"appName": "container", "buildType": "release", "version": "0.12.0", "commit": "unspecified"},
+        {"appName": "container-apiserver", "buildType": "release", "version": "0.12.0", "commit": "unspecified"},
+    ]
+    result = system_version()
+    assert result["status"] == "ok"
+    # Output is a list (array), not a dict
+    assert isinstance(result["version"], list)
+    assert len(result["version"]) == 2
+    assert result["version"][0]["appName"] == "container"
+    assert result["version"][1]["appName"] == "container-apiserver"
+    mock.assert_called_once_with(["system", "version"])
+
+
+def test_system_version_ok_with_daemon_down(mocker):
+    """When the daemon is down, the CLI still returns its own version entry."""
+    mock = _mock_cmd(mocker)
+    mock.return_value = [
+        {"appName": "container", "buildType": "release", "version": "0.12.0", "commit": "unspecified"},
+    ]
+    result = system_version()
+    assert result["status"] == "ok"
+    assert isinstance(result["version"], list)
+    assert len(result["version"]) == 1
+    assert result["version"][0]["appName"] == "container"
+
+
+def test_system_version_error(mocker):
+    """If the CLI itself fails (e.g. binary missing or unknown subcommand), return a structured error."""
+    mock = _mock_cmd(mocker)
+    mock.side_effect = ContainerCLIError("failed", 1, "unknown subcommand")
+    result = system_version()
+    assert result["status"] == "error"
+    assert "Failed to retrieve" in result["message"]
 
 
 # ---------------------------------------------------------------------------
@@ -341,6 +382,8 @@ def test_export_container_no_output_file(mocker):
     result = export_container("12345")
     assert result["status"] == "error"
     assert "output_file is required" in result["message"]
+    # Should not reference any specific Apple Container CLI version
+    assert "0.11.0" not in result["message"]
 
 
 def test_export_container_error(mocker):
@@ -364,6 +407,66 @@ def test_prune_containers_error(mocker):
     mock.side_effect = ContainerCLIError("failed", 1, "daemon down")
     result = prune_containers()
     assert result["status"] == "error"
+
+
+def test_stats_container_all(mocker):
+    """When called with no container ID, returns stats for all running containers."""
+    mock = _mock_cmd(mocker)
+    mock.return_value = [
+        {"id": "abc", "cpu": "0.5%", "memory": "100MB"},
+        {"id": "def", "cpu": "1.2%", "memory": "200MB"},
+    ]
+    result = stats_container()
+    assert result["status"] == "ok"
+    assert isinstance(result["stats"], list)
+    assert len(result["stats"]) == 2
+    called_args = mock.call_args[0][0]
+    # MUST always include --no-stream to prevent indefinite streaming
+    assert called_args == ["stats", "--no-stream"]
+
+
+def test_stats_container_single_in_list(mocker):
+    """When called with a single-element list, returns stats for that one container."""
+    mock = _mock_cmd(mocker)
+    mock.return_value = [{"id": "abc", "cpu": "0.5%", "memory": "100MB"}]
+    result = stats_container(["abc"])
+    assert result["status"] == "ok"
+    called_args = mock.call_args[0][0]
+    assert called_args == ["stats", "--no-stream", "abc"]
+
+
+def test_stats_container_multiple(mocker):
+    """When called with multiple container IDs, all are passed as positional args."""
+    mock = _mock_cmd(mocker)
+    mock.return_value = [
+        {"id": "abc", "cpu": "0.5%"},
+        {"id": "def", "cpu": "1.2%"},
+    ]
+    result = stats_container(["abc", "def"])
+    assert result["status"] == "ok"
+    called_args = mock.call_args[0][0]
+    assert called_args == ["stats", "--no-stream", "abc", "def"]
+
+
+def test_stats_container_error(mocker):
+    """ContainerCLIError is mapped to standardized error return."""
+    mock = _mock_cmd(mocker)
+    mock.side_effect = ContainerCLIError("failed", 1, "no such container")
+    result = stats_container("bad-id")
+    assert result["status"] == "error"
+    assert "Failed to retrieve" in result["message"]
+    assert "no such container" in result["details"]
+
+
+def test_stats_container_empty_list_acts_as_all(mocker):
+    """An empty list passed as containers argument should behave like None (all containers)."""
+    mock = _mock_cmd(mocker)
+    mock.return_value = []
+    result = stats_container([])
+    assert result["status"] == "ok"
+    called_args = mock.call_args[0][0]
+    # No positional container IDs — same as the None case
+    assert called_args == ["stats", "--no-stream"]
 
 
 # ---------------------------------------------------------------------------
@@ -992,6 +1095,30 @@ def test_run_container_args_override_blocked_cap_add(mocker):
     result = run_container("debian", args_override=["--cap-add", "NET_ADMIN"])
     assert result["status"] == "error"
     assert "--cap-add" in result["message"]
+
+
+def test_run_container_args_override_blocked_cap_drop(mocker):
+    result = run_container("debian", args_override=["--cap-drop", "ALL"])
+    assert result["status"] == "error"
+    assert "--cap-drop" in result["message"]
+
+
+def test_run_container_args_override_blocked_kernel_long(mocker):
+    result = run_container("debian", args_override=["--kernel", "/path/to/kernel"])
+    assert result["status"] == "error"
+    assert "--kernel" in result["message"]
+
+
+def test_run_container_args_override_blocked_kernel_short(mocker):
+    result = run_container("debian", args_override=["-k", "/path/to/kernel"])
+    assert result["status"] == "error"
+    assert "-k" in result["message"]
+
+
+def test_run_container_args_override_blocked_ssh(mocker):
+    result = run_container("debian", args_override=["--ssh"])
+    assert result["status"] == "error"
+    assert "--ssh" in result["message"]
 
 
 def test_run_container_args_override_safe_passthrough(mocker):

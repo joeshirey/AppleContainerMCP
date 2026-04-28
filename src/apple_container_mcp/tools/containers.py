@@ -182,9 +182,9 @@ def remove_container(container_id: str, force: bool = False) -> Dict[str, Any]:
 
 @mcp.tool()
 def export_container(container_id: str, output_file: Optional[str] = None) -> Dict[str, Any]:
-    """Export a container's filesystem as a tar archive. Requires an output_file path in 0.11.0."""
+    """Export a container's filesystem as a tar archive (OCI layout). Requires an output_file path."""
     if not output_file:
-        return {"status": "error", "message": "output_file is required in 0.11.0 to save the tar archive."}
+        return {"status": "error", "message": "output_file is required to save the tar archive."}
 
     args = ["export", "-o", output_file, container_id]
     try:
@@ -282,3 +282,37 @@ def prune_containers() -> Dict[str, Any]:
         return {"status": "ok", "message": "Successfully pruned stopped containers."}
     except ContainerCLIError as e:
         return {"status": "error", "message": "Failed to prune containers.", "details": e.stderr}
+
+
+@mcp.tool()
+def stats_container(containers: Optional[List[str]] = None) -> Dict[str, Any]:
+    """
+    Get a one-shot resource-usage snapshot for one or more containers.
+
+    Requires Apple Container 0.12+ (the `stats` subcommand was added in 0.12).
+
+    This MCP tool always uses the non-streaming form (`--no-stream`) to fit the
+    request/response model. The CLI's default streaming mode would block the
+    subprocess until killed by our timeout. For continuous streaming, use the
+    `container stats` CLI directly.
+
+    Args:
+        containers: Optional list of container IDs or names.
+            - None or empty list: return stats for ALL running containers.
+            - Non-empty list: return stats for the named containers.
+
+            For a single container, pass a single-element list, e.g. ["abc"].
+
+    Returns:
+        On success: {"status": "ok", "stats": <list of per-container stats>}
+            Each entry is the parsed JSON object the CLI emits per container.
+        On error:   {"status": "error", "message": str, "details": str}
+    """
+    args = ["stats", "--no-stream"]
+    if containers:
+        args.extend(containers)
+    try:
+        result = _run_container_cmd(args)
+        return {"status": "ok", "stats": result}
+    except ContainerCLIError as e:
+        return {"status": "error", "message": "Failed to retrieve container stats", "details": e.stderr}

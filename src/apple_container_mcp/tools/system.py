@@ -78,3 +78,30 @@ def system_status() -> Dict[str, Any]:
         return {"status": "ok", "system_status": result}
     except ContainerCLIError as e:
         return {"status": "error", "message": "Failed to retrieve system status", "details": str(e)}
+
+
+@mcp.tool()
+def system_version() -> Dict[str, Any]:
+    """
+    Return version information for the Apple Container CLI and (when running) the apiserver daemon.
+
+    Requires Apple Container 0.12+ (the `system version` subcommand was introduced in 0.12).
+
+    This tool does NOT require the daemon to be running — it can be used as a lightweight
+    environment probe before issuing commands that DO require the daemon. When the daemon
+    is down, the response contains only the CLI's own version entry; when the daemon is up,
+    it also includes the container-apiserver entry.
+
+    Returns:
+        On success: {"status": "ok", "version": <list of version entries>}
+            Each entry is a dict with keys: appName, buildType, version, commit.
+            The element with appName="container" is the CLI itself.
+            The element with appName="container-apiserver" (present only when the daemon
+            is running) is the apiserver daemon.
+        On error:   {"status": "error", "message": str, "details": str}
+    """
+    try:
+        result = _run_container_cmd(["system", "version"])
+        return {"status": "ok", "version": result}
+    except ContainerCLIError as e:
+        return {"status": "error", "message": "Failed to retrieve system version", "details": str(e)}
