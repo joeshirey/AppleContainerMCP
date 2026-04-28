@@ -23,7 +23,28 @@ _DESTRUCTIVE = ToolAnnotations(destructiveHint=True)
 mcp = FastMCP("apple-container-mcp")
 
 # Blocklist of flags that must never be passed via args_override in run_container.
-# These flags escalate privileges or grant capabilities that an LLM should not control.
+# These flags escalate privileges, grant capabilities, or expose host credentials
+# that an LLM should not control.
+#
+# Policy notes:
+#
+# --cap-add / --cap-drop (Apple Container 0.12+):
+#   Container 0.12 promoted Linux capability flags to documented public flags.
+#   We deliberately keep them in this blocklist and do NOT expose them as tool
+#   parameters. Capability selection is workload-specific configuration that
+#   meaningfully weakens process isolation; we treat it as advanced use that
+#   should be applied via the `container` CLI directly when truly needed.
+#   See README "Security model" and docs/TDD.md.
+#
+# --kernel / -k (Apple Container 0.12 audit finding):
+#   Allows specifying an arbitrary host filesystem path for the guest VM
+#   kernel. The daemon loads that path as kernel code; an attacker-controlled
+#   path is a privilege-escalation vector. Both spellings are blocked.
+#
+# --ssh (Apple Container 0.12 audit finding):
+#   Forwards the host's SSH agent socket into the container. Any process
+#   inside the container can use the user's SSH credentials silently. This
+#   is a credential-leak vector and is blocked from LLM-driven invocations.
 _DANGEROUS_FLAGS: frozenset[str] = frozenset(
     {
         "--privileged",
@@ -36,6 +57,9 @@ _DANGEROUS_FLAGS: frozenset[str] = frozenset(
         "--userns",
         "--cgroupns",
         "--no-new-privileges",
+        "--kernel",
+        "-k",
+        "--ssh",
     }
 )
 

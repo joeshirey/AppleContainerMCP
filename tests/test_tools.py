@@ -996,6 +996,30 @@ def test_run_container_args_override_blocked_cap_add(mocker):
     assert "--cap-add" in result["message"]
 
 
+def test_run_container_args_override_blocked_cap_drop(mocker):
+    result = run_container("debian", args_override=["--cap-drop", "ALL"])
+    assert result["status"] == "error"
+    assert "--cap-drop" in result["message"]
+
+
+def test_run_container_args_override_blocked_kernel_long(mocker):
+    result = run_container("debian", args_override=["--kernel", "/path/to/kernel"])
+    assert result["status"] == "error"
+    assert "--kernel" in result["message"]
+
+
+def test_run_container_args_override_blocked_kernel_short(mocker):
+    result = run_container("debian", args_override=["-k", "/path/to/kernel"])
+    assert result["status"] == "error"
+    assert "-k" in result["message"]
+
+
+def test_run_container_args_override_blocked_ssh(mocker):
+    result = run_container("debian", args_override=["--ssh"])
+    assert result["status"] == "error"
+    assert "--ssh" in result["message"]
+
+
 def test_run_container_args_override_safe_passthrough(mocker):
     mock = _mock_cmd(mocker)
     mock.return_value = {"raw_output": "abc"}
