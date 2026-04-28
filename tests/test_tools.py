@@ -15,6 +15,7 @@ from apple_container_mcp.tools import (
     remove_container,
     export_container,
     prune_containers,
+    stats_container,
     # exec & logs & inspect
     exec_in_container,
     get_logs,
@@ -406,6 +407,66 @@ def test_prune_containers_error(mocker):
     mock.side_effect = ContainerCLIError("failed", 1, "daemon down")
     result = prune_containers()
     assert result["status"] == "error"
+
+
+def test_stats_container_all(mocker):
+    """When called with no container ID, returns stats for all running containers."""
+    mock = _mock_cmd(mocker)
+    mock.return_value = [
+        {"id": "abc", "cpu": "0.5%", "memory": "100MB"},
+        {"id": "def", "cpu": "1.2%", "memory": "200MB"},
+    ]
+    result = stats_container()
+    assert result["status"] == "ok"
+    assert isinstance(result["stats"], list)
+    assert len(result["stats"]) == 2
+    called_args = mock.call_args[0][0]
+    # MUST always include --no-stream to prevent indefinite streaming
+    assert called_args == ["stats", "--no-stream"]
+
+
+def test_stats_container_specific(mocker):
+    """When called with a container ID, returns stats for that one container."""
+    mock = _mock_cmd(mocker)
+    mock.return_value = [{"id": "abc", "cpu": "0.5%", "memory": "100MB"}]
+    result = stats_container("abc")
+    assert result["status"] == "ok"
+    called_args = mock.call_args[0][0]
+    assert called_args == ["stats", "--no-stream", "abc"]
+
+
+def test_stats_container_multiple(mocker):
+    """When called with multiple container IDs, all are passed as positional args."""
+    mock = _mock_cmd(mocker)
+    mock.return_value = [
+        {"id": "abc", "cpu": "0.5%"},
+        {"id": "def", "cpu": "1.2%"},
+    ]
+    result = stats_container(["abc", "def"])
+    assert result["status"] == "ok"
+    called_args = mock.call_args[0][0]
+    assert called_args == ["stats", "--no-stream", "abc", "def"]
+
+
+def test_stats_container_error(mocker):
+    """ContainerCLIError is mapped to standardized error return."""
+    mock = _mock_cmd(mocker)
+    mock.side_effect = ContainerCLIError("failed", 1, "no such container")
+    result = stats_container("bad-id")
+    assert result["status"] == "error"
+    assert "Failed to retrieve" in result["message"]
+    assert "no such container" in result["details"]
+
+
+def test_stats_container_empty_list_acts_as_all(mocker):
+    """An empty list passed as containers argument should behave like None (all containers)."""
+    mock = _mock_cmd(mocker)
+    mock.return_value = []
+    result = stats_container([])
+    assert result["status"] == "ok"
+    called_args = mock.call_args[0][0]
+    # No positional container IDs — same as the None case
+    assert called_args == ["stats", "--no-stream"]
 
 
 # ---------------------------------------------------------------------------

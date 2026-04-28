@@ -1,7 +1,7 @@
 """Container lifecycle tools: run, list, start, stop, remove, export, exec, logs, inspect, prune."""
 
 import os
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 
 from . import mcp, _DESTRUCTIVE, _DANGEROUS_FLAGS, _normalize_list_result, _run_container_cmd, ContainerCLIError
 
@@ -282,3 +282,40 @@ def prune_containers() -> Dict[str, Any]:
         return {"status": "ok", "message": "Successfully pruned stopped containers."}
     except ContainerCLIError as e:
         return {"status": "error", "message": "Failed to prune containers.", "details": e.stderr}
+
+
+@mcp.tool()
+def stats_container(containers: Optional[Union[str, List[str]]] = None) -> Dict[str, Any]:
+    """
+    Get a one-shot resource-usage snapshot for one or more containers.
+
+    Requires Apple Container 0.12+ (the `stats` subcommand was added in 0.12).
+
+    This MCP tool always uses the non-streaming form (`--no-stream`) to fit the
+    request/response model. The CLI's default streaming mode would block the
+    subprocess until killed by our timeout. For continuous streaming, use the
+    `container stats` CLI directly.
+
+    Args:
+        containers: Optional container selector.
+            - None or empty list: return stats for ALL running containers.
+            - str: return stats for a single container by ID or name.
+            - List[str]: return stats for the named containers.
+
+    Returns:
+        On success: {"status": "ok", "stats": <list of per-container stats>}
+            Each entry is the parsed JSON object the CLI emits per container.
+        On error:   {"status": "error", "message": str, "details": str}
+    """
+    args = ["stats", "--no-stream"]
+    if containers:
+        if isinstance(containers, str):
+            args.append(containers)
+        else:
+            # List[str] — extend with each ID
+            args.extend(containers)
+    try:
+        result = _run_container_cmd(args)
+        return {"status": "ok", "stats": result}
+    except ContainerCLIError as e:
+        return {"status": "error", "message": "Failed to retrieve container stats", "details": e.stderr}

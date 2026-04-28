@@ -116,6 +116,7 @@ from .containers import (  # noqa: E402, F401
     inspect_container,
     exec_in_container,
     prune_containers,
+    stats_container,
 )
 from .images import (  # noqa: E402, F401
     active_builds,
