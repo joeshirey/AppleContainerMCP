@@ -6,7 +6,7 @@ import threading
 import time
 from typing import Dict, Any, List, Optional
 
-from . import mcp, _DESTRUCTIVE, _normalize_list_result, _run_container_cmd, ContainerCLIError
+from . import mcp, _DESTRUCTIVE, _normalize_list_result, _validate_home_path, _run_container_cmd, ContainerCLIError
 
 
 @mcp.tool()
@@ -131,13 +131,9 @@ def build_image(
     if not os.path.isdir(context_path):
         return {"status": "error", "message": f"Context path is not a directory: {context_path}"}
 
-    # Boundary check: only allow paths within the user's home directory.
-    # Use os.sep suffix to prevent prefix-match bypasses (e.g. /Users/joe vs /Users/joey).
-    home = os.path.expanduser("~")
-    real_path = os.path.realpath(context_path)
-    home_real = os.path.realpath(home)
-    if not (real_path == home_real or real_path.startswith(home_real + os.sep)):
-        return {"status": "error", "message": f"context_path must be within your home directory ({home})."}
+    path_error = _validate_home_path(context_path)
+    if path_error:
+        return {"status": "error", "message": f"context_path invalid: {path_error}"}
 
     # Generate a unique ID and initialise state before launching the thread.
     build_id = f"build_{next(_build_id_counter)}"

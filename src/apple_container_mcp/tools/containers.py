@@ -1,9 +1,16 @@
 """Container lifecycle tools: run, list, start, stop, remove, export, exec, logs, inspect, prune."""
 
-import os
 from typing import Dict, Any, List, Optional
 
-from . import mcp, _DESTRUCTIVE, _DANGEROUS_FLAGS, _normalize_list_result, _run_container_cmd, ContainerCLIError
+from . import (
+    mcp,
+    _DESTRUCTIVE,
+    _DANGEROUS_FLAGS,
+    _normalize_list_result,
+    _validate_home_path,
+    _run_container_cmd,
+    ContainerCLIError,
+)
 
 
 @mcp.tool()
@@ -56,13 +63,9 @@ def run_container(
     # Restrict env_file to paths within the user's home directory to prevent
     # an LLM (or prompt injection) from reading arbitrary system files.
     if env_file:
-        home_real = os.path.realpath(os.path.expanduser("~"))
-        env_file_real = os.path.realpath(env_file)
-        if not (env_file_real == home_real or env_file_real.startswith(home_real + os.sep)):
-            return {
-                "status": "error",
-                "message": f"env_file must be within your home directory ({home_real}).",
-            }
+        path_error = _validate_home_path(env_file)
+        if path_error:
+            return {"status": "error", "message": f"env_file invalid: {path_error}"}
 
     cmd_args = ["run"]
     if detach:

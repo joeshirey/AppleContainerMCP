@@ -1355,3 +1355,33 @@ def test_run_container_with_mount(mocker):
     called_args = mock.call_args[0][0]
     assert "--mount" in called_args
     assert "type=bind,src=/tmp,dst=/data" in called_args
+
+
+# ---------------------------------------------------------------------------
+# _validate_home_path — shared host-path boundary helper
+# ---------------------------------------------------------------------------
+
+
+def test_validate_home_path_accepts_home_subpath():
+    import os
+    from apple_container_mcp.tools import _validate_home_path
+
+    home = os.path.realpath(os.path.expanduser("~"))
+    assert _validate_home_path(os.path.join(home, "project")) is None
+
+
+def test_validate_home_path_rejects_outside_home():
+    from apple_container_mcp.tools import _validate_home_path
+
+    msg = _validate_home_path("/etc/passwd")
+    assert msg is not None
+    assert "home directory" in msg
+
+
+def test_validate_home_path_rejects_sibling_prefix():
+    """Guard against /Users/joe matching /Users/joey via prefix."""
+    import os
+    from apple_container_mcp.tools import _validate_home_path
+
+    home = os.path.realpath(os.path.expanduser("~"))
+    assert _validate_home_path(home + "extra") is not None

@@ -11,6 +11,8 @@ registration via their ``@mcp.tool()`` / ``@mcp.prompt()`` /
 ``@mcp.resource()`` decorators.
 """
 
+import os
+
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 from typing import Any, List
@@ -78,6 +80,24 @@ def _normalize_list_result(result: Any) -> List[Any]:
     if isinstance(result, dict) and not result:
         return []
     return [result]
+
+
+def _validate_home_path(path: str) -> "str | None":
+    """
+    Return an error message if ``path`` is not within the user's home directory,
+    otherwise None.
+
+    Restricting host-side file access to ``$HOME`` prevents an LLM (or prompt
+    injection) from reading or writing arbitrary system files. Uses realpath and a
+    trailing-separator check so that ``/Users/joe`` does not match ``/Users/joey``.
+    Shared by run_container (env_file), build_image (context_path), and the
+    container cp tools.
+    """
+    home_real = os.path.realpath(os.path.expanduser("~"))
+    target_real = os.path.realpath(path)
+    if target_real == home_real or target_real.startswith(home_real + os.sep):
+        return None
+    return f"Path must be within your home directory ({home_real})."
 
 
 # ---------------------------------------------------------------------------
