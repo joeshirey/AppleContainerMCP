@@ -126,6 +126,7 @@ def build_image(
       platform: Target platform, e.g. "linux/amd64".
       target: Multi-stage build target stage name.
     """
+    context_path = os.path.expanduser(context_path)
     if not os.path.exists(context_path):
         return {"status": "error", "message": f"Context path does not exist: {context_path}"}
     if not os.path.isdir(context_path):

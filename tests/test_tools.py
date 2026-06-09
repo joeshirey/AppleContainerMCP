@@ -802,11 +802,25 @@ def test_build_image_not_a_directory(mocker):
     assert "not a directory" in result["message"]
 
 
+def _fake_expanduser(home):
+    """Return an expanduser stub that expands a leading ~ to `home` and leaves
+    absolute paths untouched (mirrors os.path.expanduser behaviour)."""
+
+    def _expand(p):
+        if p == "~":
+            return home
+        if p.startswith("~/"):
+            return home + p[1:]
+        return p
+
+    return _expand
+
+
 def test_build_image_path_traversal_blocked(mocker):
     mocker.patch("os.path.exists", return_value=True)
     mocker.patch("os.path.isdir", return_value=True)
     mocker.patch("os.path.realpath", side_effect=lambda p: p)
-    mocker.patch("os.path.expanduser", return_value="/Users/test")
+    mocker.patch("os.path.expanduser", side_effect=_fake_expanduser("/Users/test"))
     result = build_image("/etc/passwd_dir")
     assert result["status"] == "error"
     assert "home directory" in result["message"]
@@ -817,7 +831,7 @@ def test_build_image_path_traversal_sibling_prefix(mocker):
     mocker.patch("os.path.exists", return_value=True)
     mocker.patch("os.path.isdir", return_value=True)
     mocker.patch("os.path.realpath", side_effect=lambda p: p)
-    mocker.patch("os.path.expanduser", return_value="/Users/test")
+    mocker.patch("os.path.expanduser", side_effect=_fake_expanduser("/Users/test"))
     result = build_image("/Users/tester/evil")
     assert result["status"] == "error"
     assert "home directory" in result["message"]
@@ -1401,7 +1415,7 @@ def test_prompt_setup_private_registry():
 def test_run_container_with_env_file(mocker):
     mock = _mock_cmd(mocker)
     mock.return_value = {"raw_output": "abc"}
-    mocker.patch("os.path.expanduser", return_value="/Users/test")
+    mocker.patch("os.path.expanduser", side_effect=_fake_expanduser("/Users/test"))
     mocker.patch("os.path.realpath", side_effect=lambda p: p)
     result = run_container("debian", env_file="/Users/test/.env")
     assert result["status"] == "ok"
@@ -1411,7 +1425,7 @@ def test_run_container_with_env_file(mocker):
 
 
 def test_run_container_env_file_outside_home_blocked(mocker):
-    mocker.patch("os.path.expanduser", return_value="/Users/test")
+    mocker.patch("os.path.expanduser", side_effect=_fake_expanduser("/Users/test"))
     mocker.patch("os.path.realpath", side_effect=lambda p: p)
     result = run_container("debian", env_file="/etc/passwd")
     assert result["status"] == "error"
@@ -1420,7 +1434,7 @@ def test_run_container_env_file_outside_home_blocked(mocker):
 
 def test_run_container_env_file_sibling_prefix_blocked(mocker):
     """Ensure /Users/tester/.env doesn't pass when home is /Users/test."""
-    mocker.patch("os.path.expanduser", return_value="/Users/test")
+    mocker.patch("os.path.expanduser", side_effect=_fake_expanduser("/Users/test"))
     mocker.patch("os.path.realpath", side_effect=lambda p: p)
     result = run_container("debian", env_file="/Users/tester/.env")
     assert result["status"] == "error"
@@ -1634,3 +1648,31 @@ def test_delete_machine(mocker):
     result = machines.delete_machine("m1")
     assert result["status"] == "ok"
     assert mock_cmd.call_args[0][0] == ["machine", "delete", "m1"]
+
+
+def test_copy_to_container_expands_tilde_source(mocker):
+    import os
+    from apple_container_mcp.tools import files
+
+    mock_cmd = mocker.patch.object(files, "_run_container_cmd", return_value={})
+
+    result = files.copy_to_container("~/data.txt", "web", "/app/data.txt")
+
+    assert result["status"] == "ok"
+    expanded = os.path.join(os.path.expanduser("~"), "data.txt")
+    args = mock_cmd.call_args[0][0]
+    assert args == ["cp", expanded, "web:/app/data.txt"]
+
+
+def test_copy_from_container_expands_tilde_dest(mocker):
+    import os
+    from apple_container_mcp.tools import files
+
+    mock_cmd = mocker.patch.object(files, "_run_container_cmd", return_value={})
+
+    result = files.copy_from_container("web", "/app/out.txt", "~/out.txt")
+
+    assert result["status"] == "ok"
+    expanded = os.path.join(os.path.expanduser("~"), "out.txt")
+    args = mock_cmd.call_args[0][0]
+    assert args == ["cp", "web:/app/out.txt", expanded]

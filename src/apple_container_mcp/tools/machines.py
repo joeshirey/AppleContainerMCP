@@ -161,7 +161,7 @@ def machine_logs(name: Optional[str] = None, boot: bool = False, limit: Optional
         return {"status": "error", "message": "Failed to fetch container machine logs", "details": e.stderr}
 
 
-@mcp.tool()
+@mcp.tool(annotations=_DESTRUCTIVE)
 def stop_machine(name: Optional[str] = None) -> Dict[str, Any]:
     """Stop a running container machine (default machine if name omitted)."""
     args = ["machine", "stop"]

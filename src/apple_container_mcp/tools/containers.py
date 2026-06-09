@@ -1,5 +1,6 @@
 """Container lifecycle tools: run, list, start, stop, remove, export, exec, logs, inspect, prune."""
 
+import os
 from typing import Dict, Any, List, Optional
 
 from . import (
@@ -65,6 +66,7 @@ def run_container(
     # Restrict env_file to paths within the user's home directory to prevent
     # an LLM (or prompt injection) from reading arbitrary system files.
     if env_file:
+        env_file = os.path.expanduser(env_file)
         path_error = _validate_home_path(env_file)
         if path_error:
             return {"status": "error", "message": f"env_file invalid: {path_error}"}
