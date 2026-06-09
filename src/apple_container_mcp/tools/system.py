@@ -4,6 +4,7 @@ import json
 from typing import Dict, Any
 
 from . import mcp, _DESTRUCTIVE, _run_container_cmd, ContainerCLIError
+from ..cli_wrapper import _detect_cli_major_version, version_warning, MINIMUM_CLI_MAJOR_VERSION
 
 
 # --- Resources ---
@@ -102,7 +103,11 @@ def system_version() -> Dict[str, Any]:
     """
     try:
         result = _run_container_cmd(["system", "version"])
-        return {"status": "ok", "version": result}
+        response: Dict[str, Any] = {"status": "ok", "version": result}
+        warning = version_warning()
+        if warning:
+            response["warning"] = warning
+        return response
     except ContainerCLIError as e:
         return {"status": "error", "message": "Failed to retrieve system version", "details": str(e)}
 
@@ -121,3 +126,34 @@ def system_property_list() -> Dict[str, Any]:
         return {"status": "ok", "properties": properties}
     except ContainerCLIError as e:
         return {"status": "error", "message": "Failed to list system properties", "details": str(e)}
+
+
+@mcp.tool()
+def check_environment() -> Dict[str, Any]:
+    """
+    Probe the local Apple Container CLI: report whether it is installed and whether it
+    meets the minimum supported major version (1.0+). Use this as a first step when
+    diagnosing setup problems. Does not require the daemon to be running.
+    """
+    major = _detect_cli_major_version()
+    if major is None:
+        return {
+            "status": "error",
+            "message": "The Apple Container CLI ('container') was not found on PATH. "
+            "Install Apple Container 1.0+ from https://github.com/apple/container.",
+        }
+    if major < MINIMUM_CLI_MAJOR_VERSION:
+        return {
+            "status": "warning",
+            "cli_major_version": major,
+            "warning": (
+                f"Detected Apple Container CLI major version {major}, but this server requires "
+                f"{MINIMUM_CLI_MAJOR_VERSION}.0+. Upgrade with /usr/local/bin/update-container.sh "
+                f"(or via Homebrew). Older versions are not supported and may fail."
+            ),
+        }
+    return {
+        "status": "ok",
+        "cli_major_version": major,
+        "message": f"Apple Container CLI {major}.x detected (meets the {MINIMUM_CLI_MAJOR_VERSION}.0+ minimum).",
+    }

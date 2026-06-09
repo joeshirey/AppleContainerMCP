@@ -214,6 +214,52 @@ def test_system_property_list_error(mocker):
     assert result["status"] == "error"
 
 
+def test_check_environment_ok_when_version_current(mocker):
+    from apple_container_mcp.tools import system
+
+    mocker.patch.object(system, "_detect_cli_major_version", return_value=1)
+
+    result = system.check_environment()
+
+    assert result["status"] == "ok"
+    assert result["cli_major_version"] == 1
+    assert result.get("warning") is None
+
+
+def test_check_environment_warns_on_old_version(mocker):
+    from apple_container_mcp.tools import system
+
+    mocker.patch.object(system, "_detect_cli_major_version", return_value=0)
+
+    result = system.check_environment()
+
+    assert result["status"] == "warning"
+    assert "1.0" in result["warning"]
+
+
+def test_check_environment_errors_when_cli_missing(mocker):
+    from apple_container_mcp.tools import system
+
+    mocker.patch.object(system, "_detect_cli_major_version", return_value=None)
+
+    result = system.check_environment()
+
+    assert result["status"] == "error"
+    assert "not found" in result["message"].lower()
+
+
+def test_system_version_includes_warning_on_old_major(mocker):
+    from apple_container_mcp.tools import system
+
+    mocker.patch.object(system, "_run_container_cmd", return_value=[{"appName": "container", "version": "0.12.0"}])
+    mocker.patch.object(system, "version_warning", return_value="old version warning")
+
+    result = system.system_version()
+
+    assert result["status"] == "ok"
+    assert result["warning"] == "old version warning"
+
+
 # ---------------------------------------------------------------------------
 # Container lifecycle
 # ---------------------------------------------------------------------------
