@@ -105,3 +105,19 @@ def system_version() -> Dict[str, Any]:
         return {"status": "ok", "version": result}
     except ContainerCLIError as e:
         return {"status": "error", "message": "Failed to retrieve system version", "details": str(e)}
+
+
+@mcp.tool()
+def system_property_list() -> Dict[str, Any]:
+    """
+    List Apple Container system property values (TOML-backed config introduced in 1.0).
+
+    Replaces the removed `system property get`/`set` subcommands. Requires the
+    container system service to be running.
+    """
+    try:
+        result = _run_container_cmd(["system", "property", "list"])
+        properties = result if isinstance(result, list) else ([] if result == {} else [result])
+        return {"status": "ok", "properties": properties}
+    except ContainerCLIError as e:
+        return {"status": "error", "message": "Failed to list system properties", "details": str(e)}

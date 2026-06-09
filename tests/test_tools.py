@@ -193,6 +193,27 @@ def test_system_version_error(mocker):
     assert "Failed to retrieve" in result["message"]
 
 
+def test_system_property_list_ok(mocker):
+    from apple_container_mcp.tools import system
+
+    mocker.patch.object(system, "_run_container_cmd", return_value=[{"id": "dns.domain", "value": "test"}])
+
+    result = system.system_property_list()
+
+    assert result["status"] == "ok"
+    assert result["properties"] == [{"id": "dns.domain", "value": "test"}]
+
+
+def test_system_property_list_error(mocker):
+    from apple_container_mcp.tools import system
+    from apple_container_mcp.cli_wrapper import ContainerCLIError
+
+    mocker.patch.object(system, "_run_container_cmd", side_effect=ContainerCLIError("boom", 1, "stderr"))
+
+    result = system.system_property_list()
+    assert result["status"] == "error"
+
+
 # ---------------------------------------------------------------------------
 # Container lifecycle
 # ---------------------------------------------------------------------------

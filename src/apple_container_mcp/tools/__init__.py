@@ -125,6 +125,7 @@ from .system import (  # noqa: E402, F401
     stop_system,
     system_status,
     system_version,
+    system_property_list,
 )
 from .containers import (  # noqa: E402, F401
     run_container,
