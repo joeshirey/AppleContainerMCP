@@ -112,6 +112,7 @@ from . import volumes  # noqa: E402, F401
 from . import registry  # noqa: E402, F401
 from . import builder  # noqa: E402, F401
 from . import files  # noqa: E402, F401
+from . import machines  # noqa: E402, F401
 from . import prompts  # noqa: E402, F401
 
 # ---------------------------------------------------------------------------
@@ -183,6 +184,17 @@ from .builder import (  # noqa: E402, F401
 from .files import (  # noqa: E402, F401
     copy_to_container,
     copy_from_container,
+)
+from .machines import (  # noqa: E402, F401
+    create_machine,
+    run_machine,
+    list_machines,
+    inspect_machine,
+    set_machine,
+    set_default_machine,
+    machine_logs,
+    stop_machine,
+    delete_machine,
 )
 from .prompts import (  # noqa: E402, F401
     troubleshoot_container,

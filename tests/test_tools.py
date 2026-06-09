@@ -1522,3 +1522,115 @@ def test_copy_from_container_rejects_dest_outside_home(mocker):
     assert result["status"] == "error"
     assert "home directory" in result["message"]
     mock_cmd.assert_not_called()
+
+
+def test_create_machine_builds_command(mocker):
+    from apple_container_mcp.tools import machines
+
+    mock_cmd = mocker.patch.object(machines, "_run_container_cmd", return_value={})
+
+    result = machines.create_machine("alpine:3.22", name="m1", cpus=4, memory="8G", home_mount="ro", set_default=True)
+
+    assert result["status"] == "ok"
+    args = mock_cmd.call_args[0][0]
+    assert args[:2] == ["machine", "create"]
+    assert "--name" in args and "m1" in args
+    assert "--cpus" in args and "4" in args
+    assert "--memory" in args and "8G" in args
+    assert "--home-mount" in args and "ro" in args
+    assert "--set-default" in args
+    assert args[-1] == "alpine:3.22"
+
+
+def test_list_machines_ok(mocker):
+    from apple_container_mcp.tools import machines
+
+    mocker.patch.object(machines, "_run_container_cmd", return_value=[{"name": "m1"}])
+
+    result = machines.list_machines()
+    assert result["status"] == "ok"
+    assert result["machines"] == [{"name": "m1"}]
+    assert result["count"] == 1
+
+
+def test_run_machine_builds_command(mocker):
+    from apple_container_mcp.tools import machines
+
+    mock_cmd = mocker.patch.object(machines, "_run_container_cmd", return_value={"raw_output": "linux"})
+
+    result = machines.run_machine(["uname", "-a"], name="m1")
+
+    assert result["status"] == "ok"
+    args = mock_cmd.call_args[0][0]
+    assert args[:2] == ["machine", "run"]
+    assert "-n" in args and "m1" in args
+    assert args[-2:] == ["uname", "-a"]
+
+
+def test_inspect_machine_default(mocker):
+    from apple_container_mcp.tools import machines
+
+    mock_cmd = mocker.patch.object(machines, "_run_container_cmd", return_value={"name": "default"})
+
+    result = machines.inspect_machine()
+    assert result["status"] == "ok"
+    assert mock_cmd.call_args[0][0] == ["machine", "inspect"]
+
+
+def test_set_machine_builds_settings(mocker):
+    from apple_container_mcp.tools import machines
+
+    mock_cmd = mocker.patch.object(machines, "_run_container_cmd", return_value={})
+
+    result = machines.set_machine(name="m1", cpus=2, memory="4G", home_mount="rw")
+    assert result["status"] == "ok"
+    args = mock_cmd.call_args[0][0]
+    assert args[:2] == ["machine", "set"]
+    assert "-n" in args and "m1" in args
+    assert "cpus=2" in args
+    assert "memory=4G" in args
+    assert "home-mount=rw" in args
+
+
+def test_set_default_machine(mocker):
+    from apple_container_mcp.tools import machines
+
+    mock_cmd = mocker.patch.object(machines, "_run_container_cmd", return_value={})
+
+    result = machines.set_default_machine("m1")
+    assert result["status"] == "ok"
+    assert mock_cmd.call_args[0][0] == ["machine", "set-default", "m1"]
+
+
+def test_machine_logs_with_boot_and_limit(mocker):
+    from apple_container_mcp.tools import machines
+
+    mock_cmd = mocker.patch.object(machines, "_run_container_cmd", return_value={"raw_output": "log"})
+
+    result = machines.machine_logs(name="m1", boot=True, limit=50)
+    assert result["status"] == "ok"
+    args = mock_cmd.call_args[0][0]
+    assert args[0:2] == ["machine", "logs"]
+    assert "--boot" in args
+    assert "-n" in args and "50" in args
+    assert args[-1] == "m1"
+
+
+def test_stop_machine_default(mocker):
+    from apple_container_mcp.tools import machines
+
+    mock_cmd = mocker.patch.object(machines, "_run_container_cmd", return_value={})
+
+    result = machines.stop_machine()
+    assert result["status"] == "ok"
+    assert mock_cmd.call_args[0][0] == ["machine", "stop"]
+
+
+def test_delete_machine(mocker):
+    from apple_container_mcp.tools import machines
+
+    mock_cmd = mocker.patch.object(machines, "_run_container_cmd", return_value={})
+
+    result = machines.delete_machine("m1")
+    assert result["status"] == "ok"
+    assert mock_cmd.call_args[0][0] == ["machine", "delete", "m1"]
