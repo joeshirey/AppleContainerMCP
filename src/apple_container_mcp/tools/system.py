@@ -146,11 +146,7 @@ def check_environment() -> Dict[str, Any]:
         return {
             "status": "warning",
             "cli_major_version": major,
-            "warning": (
-                f"Detected Apple Container CLI major version {major}, but this server requires "
-                f"{MINIMUM_CLI_MAJOR_VERSION}.0+. Upgrade with /usr/local/bin/update-container.sh "
-                f"(or via Homebrew). Older versions are not supported and may fail."
-            ),
+            "warning": version_warning(major),
         }
     return {
         "status": "ok",

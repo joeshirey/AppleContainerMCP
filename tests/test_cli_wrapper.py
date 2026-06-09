@@ -275,3 +275,13 @@ def test_version_warning_returns_none_for_current_major(mocker):
 
     mocker.patch.object(cli_wrapper, "_detect_cli_major_version", return_value=1)
     assert cli_wrapper.version_warning() is None
+
+
+def test_version_warning_accepts_explicit_major(mocker):
+    from apple_container_mcp import cli_wrapper
+
+    # Should not need to probe when major is passed explicitly.
+    spy = mocker.patch.object(cli_wrapper, "_detect_cli_major_version")
+    assert cli_wrapper.version_warning(0) is not None
+    assert cli_wrapper.version_warning(1) is None
+    spy.assert_not_called()

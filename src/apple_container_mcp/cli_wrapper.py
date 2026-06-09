@@ -57,14 +57,18 @@ def _detect_cli_major_version() -> Optional[int]:
     return int(match.group(1))
 
 
-def version_warning() -> Optional[str]:
+def version_warning(major: Optional[int] = None) -> Optional[str]:
     """
     Return a human-readable warning string if the installed CLI is older than the
-    minimum supported major version, otherwise None. None is also returned when the
-    version cannot be detected (the missing-binary case is handled per-command in
-    _run_container_cmd, which produces a hard error).
+    minimum supported major version, otherwise None.
+
+    If ``major`` is provided, it is used directly (so callers that already detected
+    the version need not probe again); otherwise the version is detected. None is
+    also returned when the version cannot be detected (the missing-binary case is
+    handled per-command in _run_container_cmd, which produces a hard error).
     """
-    major = _detect_cli_major_version()
+    if major is None:
+        major = _detect_cli_major_version()
     if major is not None and major < MINIMUM_CLI_MAJOR_VERSION:
         return (
             f"Detected Apple Container CLI major version {major}, but this server requires "
