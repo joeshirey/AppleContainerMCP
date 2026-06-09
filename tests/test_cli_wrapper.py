@@ -190,3 +190,66 @@ def test_run_container_cmd_builder_ls_no_longer_in_allowlist(mocker):
     called_cmd = mock_run.call_args[0][0]
     # --format json must NOT have been auto-appended (entry was removed from allowlist)
     assert "--format" not in called_cmd, "builder ls should not auto-receive --format json"
+
+
+def test_detect_cli_major_version_parses_version_string(mocker):
+    from apple_container_mcp import cli_wrapper
+
+    cli_wrapper._detect_cli_major_version.cache_clear()
+    mock_run = mocker.patch("subprocess.run")
+    mock_result = mocker.Mock()
+    mock_result.stdout = "container CLI version 1.0.0 (build: release, commit: unspeci)"
+    mock_result.returncode = 0
+    mock_run.return_value = mock_result
+
+    assert cli_wrapper._detect_cli_major_version() == 1
+
+
+def test_detect_cli_major_version_returns_none_when_missing(mocker):
+    from apple_container_mcp import cli_wrapper
+
+    cli_wrapper._detect_cli_major_version.cache_clear()
+    mocker.patch("subprocess.run", side_effect=FileNotFoundError())
+
+    assert cli_wrapper._detect_cli_major_version() is None
+
+
+def test_detect_cli_major_version_returns_none_on_unparseable(mocker):
+    from apple_container_mcp import cli_wrapper
+
+    cli_wrapper._detect_cli_major_version.cache_clear()
+    mock_run = mocker.patch("subprocess.run")
+    mock_result = mocker.Mock()
+    mock_result.stdout = "garbage output"
+    mock_result.returncode = 0
+    mock_run.return_value = mock_result
+
+    assert cli_wrapper._detect_cli_major_version() is None
+
+
+def test_run_container_cmd_missing_binary_raises_clear_error(mocker):
+    from apple_container_mcp.cli_wrapper import _run_container_cmd, ContainerCLIError
+
+    mocker.patch("subprocess.run", side_effect=FileNotFoundError())
+
+    with pytest.raises(ContainerCLIError) as exc_info:
+        _run_container_cmd(["ls"])
+
+    assert "not found" in str(exc_info.value).lower()
+    assert exc_info.value.exit_code == -1
+
+
+def test_version_warning_returns_message_for_old_major(mocker):
+    from apple_container_mcp import cli_wrapper
+
+    mocker.patch.object(cli_wrapper, "_detect_cli_major_version", return_value=0)
+    msg = cli_wrapper.version_warning()
+    assert msg is not None
+    assert "1.0" in msg
+
+
+def test_version_warning_returns_none_for_current_major(mocker):
+    from apple_container_mcp import cli_wrapper
+
+    mocker.patch.object(cli_wrapper, "_detect_cli_major_version", return_value=1)
+    assert cli_wrapper.version_warning() is None
