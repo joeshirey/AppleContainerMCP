@@ -18,6 +18,7 @@ def run_container(
     image: str,
     cpus: Optional[int] = None,
     memory: Optional[str] = None,
+    shm_size: Optional[str] = None,
     name: Optional[str] = None,
     detach: bool = True,
     ports: Optional[List[str]] = None,
@@ -39,6 +40,7 @@ def run_container(
     """
     Start a container from an image with optional resource constraints, networking, ports, env vars,
     volume mounts, and more. Pass a command to run via args_override.
+    Use shm_size to set the size of /dev/shm (e.g. "1G").
     Examples:
       run_container("debian", memory="4g", cpus=2, ports=["8080:8080"])
       run_container("ubuntu", rm=True, detach=False, args_override=["bash", "-c", "echo hi"])
@@ -78,6 +80,8 @@ def run_container(
         cmd_args.extend(["--cpus", str(cpus)])
     if memory:
         cmd_args.extend(["--memory", memory])
+    if shm_size:
+        cmd_args.extend(["--shm-size", shm_size])
     if network:
         cmd_args.extend(["--network", network])
     if entrypoint:

@@ -266,6 +266,19 @@ def test_run_container_new_flags(mocker):
     assert "echo" in called_args
 
 
+def test_run_container_passes_shm_size(mocker):
+    from apple_container_mcp.tools import containers
+
+    mock_cmd = mocker.patch.object(containers, "_run_container_cmd", return_value={"raw_output": "abc123"})
+
+    result = containers.run_container("debian", shm_size="1G")
+
+    assert result["status"] == "ok"
+    called_args = mock_cmd.call_args[0][0]
+    assert "--shm-size" in called_args
+    assert "1G" in called_args
+
+
 def test_run_container_error(mocker):
     mock = _mock_cmd(mocker)
     mock.side_effect = ContainerCLIError("Command failed", 125, "Image not found")
