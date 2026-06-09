@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-06-09
+
+### Added
+
+- Apple Container 1.0 support; minimum CLI version raised to 1.0.0.
+- `container machine` tool suite: create_machine, run_machine, list_machines,
+  inspect_machine, set_machine, set_default_machine, machine_logs, stop_machine,
+  delete_machine.
+- File transfer tools: copy_to_container, copy_from_container (host paths restricted
+  to the home directory in both directions).
+- `system_property_list` tool (replaces the removed `system property get`/`set`).
+- `check_environment` tool and a version warning on `system_version`.
+- `--shm-size` option on run_container.
+- Cached CLI version probe with a clear error when the binary is missing and a soft
+  warning when the major version is below 1.0.
+
+### Changed
+
+- Minimum supported Apple Container CLI is now 1.0.0 (the 1.0 daemon dropped XPC v0
+  compatibility, so older clients cannot interoperate).
+- Extracted a shared home-directory path-validation helper used by run_container,
+  build_image, and the cp tools.
+
+### Notes
+
+- `--stop-signal` was listed in the 1.0 release notes but is not present on
+  `container run` in the 1.0.0 binary; it is not exposed.
+- Structured (ls/inspect) output shapes were re-validated against 1.0; JSON is still
+  passed through to clients unchanged.
+
 ## [0.2.0] - 2026-04-28
 
 Apple Container 0.12 support.

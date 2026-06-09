@@ -102,6 +102,19 @@ def _run_container_cmd(args: List[str], timeout: Optional[int] = None) -> Any:
 | prune_* | container * prune | Clean up unused resources (containers, images, networks, volumes). |
 | system_version | container system version | Returns CLI/apiserver versions as JSON. Works without the daemon. (Apple Container 0.12+) |
 | stats_container | container stats --no-stream [containers...] | One-shot resource-usage snapshot. Always non-streaming. (Apple Container 0.12+) |
+| system_property_list | container system property list | List system property values (TOML config). Replaces removed `system property get`/`set`. (Apple Container 1.0+) |
+| check_environment | N/A (probes `container --version`) | Report whether the CLI is installed and meets the 1.0+ minimum. Works without the daemon. |
+| copy_to_container | container cp [source] [id]:[dest] | Copy host→container. Host `source` restricted to home directory. |
+| copy_from_container | container cp [id]:[source] [dest] | Copy container→host. Host `dest` restricted to home directory. |
+| create_machine | container machine create [image] | Create/boot a persistent Linux machine. Maps cpus, memory, home-mount. (Apple Container 1.0+) |
+| run_machine | container machine run ... | Run a command in a machine (booting if needed); default machine if name omitted. (Apple Container 1.0+) |
+| list_machines | container machine ls | Parse JSON array, return count and machines. (Apple Container 1.0+) |
+| inspect_machine | container machine inspect [name] | Detailed machine info (default machine if name omitted). (Apple Container 1.0+) |
+| set_machine | container machine set ... | Update machine config (cpus/memory/home-mount); effective after restart. (Apple Container 1.0+) |
+| set_default_machine | container machine set-default [name] | Set the default machine. (Apple Container 1.0+) |
+| machine_logs | container machine logs [name] | Fetch machine logs; `--boot` for boot log, `-n` to cap lines. (Apple Container 1.0+) |
+| stop_machine | container machine stop [name] | Stop a running machine (default machine if name omitted). (Apple Container 1.0+) |
+| delete_machine | container machine delete [name] | Delete a machine (irreversible, destructive). (Apple Container 1.0+) |
 
 ### **C. Prompts (Guided Workflows)**
 
@@ -126,14 +139,14 @@ The server implements several `mcp.prompt` handlers to guide users through compl
 ## **5\. Security Model**
 
 * **Local Execution:** The MCP server only accepts requests from the local MCP Host.  
-* **Path Validation:** `build_image` validates that `context_path` is within the user's home directory using `os.path.realpath` with a trailing `os.sep` check to prevent prefix-match bypasses (e.g. `/Users/joe` vs `/Users/joey`). The same guard is applied to `env_file` in `run_container`.  
+* **Path Validation:** `build_image` validates that `context_path` is within the user's home directory using `os.path.realpath` with a trailing `os.sep` check to prevent prefix-match bypasses (e.g. `/Users/joe` vs `/Users/joey`). The same guard (extracted into a shared `_validate_home_path` helper) is applied to `env_file` in `run_container` and to the HOST path of the cp tools: `copy_to_container`'s `source` and `copy_from_container`'s `dest` are both restricted to the home directory.  
 * **Argument Sanitization:** `subprocess.run` is called with a list of arguments (never `shell=True`) to prevent shell injection. `run_container`'s `args_override` parameter is validated against a blocklist of dangerous flags to prevent privilege escalation, capability grants, and credential exposure via LLM prompt injection. The current blocklist: `--privileged`, `--cap-add`, `--cap-drop`, `--security-opt`, `--device`, `--pid`, `--ipc`, `--userns`, `--cgroupns`, `--no-new-privileges`, `--kernel` / `-k`, `--ssh`.
 * **Capabilities and 0.12 audit additions:** Apple Container 0.12 promoted `--cap-add` / `--cap-drop` to documented public flags. This MCP deliberately keeps them in the blocklist and does NOT expose them as tool parameters. The 0.12 CLI audit also surfaced `--kernel` / `-k` (arbitrary host kernel-image path injection) and `--ssh` (host SSH-agent socket forwarding); both have been added to the blocklist for the same reasons.  
 * **Credential Handling:** `registry_login` passes the password via `stdin` to avoid exposing it in process arguments.
 
 ## **6\. Deployment Plan**
 
-1. **Pre-requisites:** Python 3.11+, `uv` (`brew install uv`), and the Apple `container` CLI (`brew install container`).  
+1. **Pre-requisites:** Python 3.11+, `uv` (`brew install uv`), and the Apple `container` CLI 1.0+ (`brew install container`; Apple Silicon and macOS 26 recommended).  
 2. **Installation:** Run directly via `uvx` (no clone required) or install from a local clone using `uv sync --dev`.  
 3. **Configuration:** Add the MCP server to your client's configuration. Example for Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.json`):
 
