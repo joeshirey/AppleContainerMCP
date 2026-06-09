@@ -112,6 +112,8 @@ def _run_container_cmd(args: List[str], timeout: Optional[int] = None) -> Any:
         ("system", "status"),  # container system status (verified in 0.12)
         ("builder", "status"),  # container builder status (verified in 0.12)
         ("stats",),  # container stats (verified in 0.12)
+        ("machine", "ls"),  # container machine ls (1.0) — json|table only
+        ("system", "property", "list"),  # container system property list (1.0) — json|toml
     }
     leading = tuple(args)
     # Check if the start of the current command matches any entry in our JSON-capable allowlist.
