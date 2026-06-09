@@ -111,6 +111,7 @@ from . import networks  # noqa: E402, F401
 from . import volumes  # noqa: E402, F401
 from . import registry  # noqa: E402, F401
 from . import builder  # noqa: E402, F401
+from . import files  # noqa: E402, F401
 from . import prompts  # noqa: E402, F401
 
 # ---------------------------------------------------------------------------
@@ -176,6 +177,10 @@ from .builder import (  # noqa: E402, F401
     builder_start,
     builder_stop,
     builder_status,
+)
+from .files import (  # noqa: E402, F401
+    copy_to_container,
+    copy_from_container,
 )
 from .prompts import (  # noqa: E402, F401
     troubleshoot_container,

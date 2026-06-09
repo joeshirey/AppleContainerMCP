@@ -1398,3 +1398,60 @@ def test_validate_home_path_rejects_sibling_prefix():
 
     home = os.path.realpath(os.path.expanduser("~"))
     assert _validate_home_path(home + "extra") is not None
+
+
+# ---------------------------------------------------------------------------
+# files — host<->container copy tools (container cp)
+# ---------------------------------------------------------------------------
+
+
+def test_copy_to_container_builds_command(mocker):
+    import os
+    from apple_container_mcp.tools import files
+
+    mock_cmd = mocker.patch.object(files, "_run_container_cmd", return_value={})
+    src = os.path.join(os.path.expanduser("~"), "data.txt")
+
+    result = files.copy_to_container(src, "web", "/app/data.txt")
+
+    assert result["status"] == "ok"
+    args = mock_cmd.call_args[0][0]
+    assert args == ["cp", src, "web:/app/data.txt"]
+
+
+def test_copy_to_container_rejects_source_outside_home(mocker):
+    from apple_container_mcp.tools import files
+
+    mock_cmd = mocker.patch.object(files, "_run_container_cmd")
+
+    result = files.copy_to_container("/etc/passwd", "web", "/tmp/x")
+
+    assert result["status"] == "error"
+    assert "home directory" in result["message"]
+    mock_cmd.assert_not_called()
+
+
+def test_copy_from_container_builds_command(mocker):
+    import os
+    from apple_container_mcp.tools import files
+
+    mock_cmd = mocker.patch.object(files, "_run_container_cmd", return_value={})
+    dest = os.path.join(os.path.expanduser("~"), "out.txt")
+
+    result = files.copy_from_container("web", "/app/out.txt", dest)
+
+    assert result["status"] == "ok"
+    args = mock_cmd.call_args[0][0]
+    assert args == ["cp", "web:/app/out.txt", dest]
+
+
+def test_copy_from_container_rejects_dest_outside_home(mocker):
+    from apple_container_mcp.tools import files
+
+    mock_cmd = mocker.patch.object(files, "_run_container_cmd")
+
+    result = files.copy_from_container("web", "/app/out.txt", "/etc/evil")
+
+    assert result["status"] == "error"
+    assert "home directory" in result["message"]
+    mock_cmd.assert_not_called()
