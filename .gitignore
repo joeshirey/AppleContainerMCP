@@ -1,5 +1,7 @@
 # Superpowers local scratch (specs, plans, session state)
 .local/
+# Superpowers committing-work gate cache
+.superpowers/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
