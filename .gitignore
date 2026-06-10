@@ -1,3 +1,8 @@
+# Superpowers local scratch (specs, plans, session state)
+.local/
+# Superpowers committing-work gate cache
+.superpowers/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -205,3 +210,5 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+.local/
+

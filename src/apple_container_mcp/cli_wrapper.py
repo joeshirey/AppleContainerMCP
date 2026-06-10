@@ -1,5 +1,7 @@
+import functools
 import json
 import logging
+import re
 import subprocess
 from typing import Any, List, Optional
 
@@ -30,6 +32,50 @@ LONG_RUNNING_TIMEOUT_SECONDS = 300
 
 # Commands (any token in args) that indicate a long-running operation deserving the extended timeout.
 LONG_RUNNING_COMMANDS = {"pull", "push", "start", "build"}
+
+# Minimum supported Apple Container CLI major version. The 1.0 daemon dropped
+# XPC v0 compatibility, so older CLIs cannot interoperate with a 1.0 install.
+MINIMUM_CLI_MAJOR_VERSION = 1
+
+
+@functools.lru_cache(maxsize=1)
+def _detect_cli_major_version() -> Optional[int]:
+    """
+    Return the installed `container` CLI major version as an int, or None if the
+    binary is missing or its version output cannot be parsed.
+
+    Cached for the process lifetime so we shell out at most once. Daemon-independent:
+    `container --version` works whether or not the apiserver is running.
+    """
+    try:
+        proc = subprocess.run(["container", "--version"], capture_output=True, text=True, timeout=10)
+    except (FileNotFoundError, OSError, subprocess.SubprocessError):
+        return None
+    match = re.search(r"version\s+(\d+)\.\d+\.\d+", proc.stdout)
+    if not match:
+        return None
+    return int(match.group(1))
+
+
+def version_warning(major: Optional[int] = None) -> Optional[str]:
+    """
+    Return a human-readable warning string if the installed CLI is older than the
+    minimum supported major version, otherwise None.
+
+    If ``major`` is provided, it is used directly (so callers that already detected
+    the version need not probe again); otherwise the version is detected. None is
+    also returned when the version cannot be detected (the missing-binary case is
+    handled per-command in _run_container_cmd, which produces a hard error).
+    """
+    if major is None:
+        major = _detect_cli_major_version()
+    if major is not None and major < MINIMUM_CLI_MAJOR_VERSION:
+        return (
+            f"Detected Apple Container CLI major version {major}, but this server requires "
+            f"{MINIMUM_CLI_MAJOR_VERSION}.0+. Upgrade with /usr/local/bin/update-container.sh "
+            f"(or via Homebrew). Older versions are not supported and may fail."
+        )
+    return None
 
 
 def _run_container_cmd(args: List[str], timeout: Optional[int] = None) -> Any:
@@ -70,6 +116,8 @@ def _run_container_cmd(args: List[str], timeout: Optional[int] = None) -> Any:
         ("system", "status"),  # container system status (verified in 0.12)
         ("builder", "status"),  # container builder status (verified in 0.12)
         ("stats",),  # container stats (verified in 0.12)
+        ("machine", "ls"),  # container machine ls (1.0) — json|table only
+        ("system", "property", "list"),  # container system property list (1.0) — json|toml
     }
     leading = tuple(args)
     # Check if the start of the current command matches any entry in our JSON-capable allowlist.
@@ -107,6 +155,14 @@ def _run_container_cmd(args: List[str], timeout: Optional[int] = None) -> Any:
             if matches_allowlist or args[0] == "inspect":
                 return {"raw_output": stdout, "error": "Failed to parse JSON output"}
             return {"raw_output": stdout}
+    except FileNotFoundError as e:
+        logger.error("container CLI not found on PATH")
+        raise ContainerCLIError(
+            "The Apple Container CLI ('container') was not found on PATH. "
+            "Install Apple Container 1.0+ from https://github.com/apple/container.",
+            -1,
+            "container binary not found",
+        ) from e
     except subprocess.TimeoutExpired as e:
         logger.error("Command timed out after %ss: %s", timeout, " ".join(full_cmd))
         # Re-raise as a domain-specific error with the command context.

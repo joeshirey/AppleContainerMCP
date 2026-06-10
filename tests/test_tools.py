@@ -193,6 +193,73 @@ def test_system_version_error(mocker):
     assert "Failed to retrieve" in result["message"]
 
 
+def test_system_property_list_ok(mocker):
+    from apple_container_mcp.tools import system
+
+    mocker.patch.object(system, "_run_container_cmd", return_value=[{"id": "dns.domain", "value": "test"}])
+
+    result = system.system_property_list()
+
+    assert result["status"] == "ok"
+    assert result["properties"] == [{"id": "dns.domain", "value": "test"}]
+
+
+def test_system_property_list_error(mocker):
+    from apple_container_mcp.tools import system
+    from apple_container_mcp.cli_wrapper import ContainerCLIError
+
+    mocker.patch.object(system, "_run_container_cmd", side_effect=ContainerCLIError("boom", 1, "stderr"))
+
+    result = system.system_property_list()
+    assert result["status"] == "error"
+
+
+def test_check_environment_ok_when_version_current(mocker):
+    from apple_container_mcp.tools import system
+
+    mocker.patch.object(system, "_detect_cli_major_version", return_value=1)
+
+    result = system.check_environment()
+
+    assert result["status"] == "ok"
+    assert result["cli_major_version"] == 1
+    assert result.get("warning") is None
+
+
+def test_check_environment_warns_on_old_version(mocker):
+    from apple_container_mcp.tools import system
+
+    mocker.patch.object(system, "_detect_cli_major_version", return_value=0)
+
+    result = system.check_environment()
+
+    assert result["status"] == "warning"
+    assert "1.0" in result["warning"]
+
+
+def test_check_environment_errors_when_cli_missing(mocker):
+    from apple_container_mcp.tools import system
+
+    mocker.patch.object(system, "_detect_cli_major_version", return_value=None)
+
+    result = system.check_environment()
+
+    assert result["status"] == "error"
+    assert "not found" in result["message"].lower()
+
+
+def test_system_version_includes_warning_on_old_major(mocker):
+    from apple_container_mcp.tools import system
+
+    mocker.patch.object(system, "_run_container_cmd", return_value=[{"appName": "container", "version": "0.12.0"}])
+    mocker.patch.object(system, "version_warning", return_value="old version warning")
+
+    result = system.system_version()
+
+    assert result["status"] == "ok"
+    assert result["warning"] == "old version warning"
+
+
 # ---------------------------------------------------------------------------
 # Container lifecycle
 # ---------------------------------------------------------------------------
@@ -264,6 +331,19 @@ def test_run_container_new_flags(mocker):
     assert "-u" in called_args
     assert "--label" in called_args
     assert "echo" in called_args
+
+
+def test_run_container_passes_shm_size(mocker):
+    from apple_container_mcp.tools import containers
+
+    mock_cmd = mocker.patch.object(containers, "_run_container_cmd", return_value={"raw_output": "abc123"})
+
+    result = containers.run_container("debian", shm_size="1G")
+
+    assert result["status"] == "ok"
+    called_args = mock_cmd.call_args[0][0]
+    assert "--shm-size" in called_args
+    assert "1G" in called_args
 
 
 def test_run_container_error(mocker):
@@ -722,11 +802,25 @@ def test_build_image_not_a_directory(mocker):
     assert "not a directory" in result["message"]
 
 
+def _fake_expanduser(home):
+    """Return an expanduser stub that expands a leading ~ to `home` and leaves
+    absolute paths untouched (mirrors os.path.expanduser behaviour)."""
+
+    def _expand(p):
+        if p == "~":
+            return home
+        if p.startswith("~/"):
+            return home + p[1:]
+        return p
+
+    return _expand
+
+
 def test_build_image_path_traversal_blocked(mocker):
     mocker.patch("os.path.exists", return_value=True)
     mocker.patch("os.path.isdir", return_value=True)
     mocker.patch("os.path.realpath", side_effect=lambda p: p)
-    mocker.patch("os.path.expanduser", return_value="/Users/test")
+    mocker.patch("os.path.expanduser", side_effect=_fake_expanduser("/Users/test"))
     result = build_image("/etc/passwd_dir")
     assert result["status"] == "error"
     assert "home directory" in result["message"]
@@ -737,7 +831,7 @@ def test_build_image_path_traversal_sibling_prefix(mocker):
     mocker.patch("os.path.exists", return_value=True)
     mocker.patch("os.path.isdir", return_value=True)
     mocker.patch("os.path.realpath", side_effect=lambda p: p)
-    mocker.patch("os.path.expanduser", return_value="/Users/test")
+    mocker.patch("os.path.expanduser", side_effect=_fake_expanduser("/Users/test"))
     result = build_image("/Users/tester/evil")
     assert result["status"] == "error"
     assert "home directory" in result["message"]
@@ -1321,7 +1415,7 @@ def test_prompt_setup_private_registry():
 def test_run_container_with_env_file(mocker):
     mock = _mock_cmd(mocker)
     mock.return_value = {"raw_output": "abc"}
-    mocker.patch("os.path.expanduser", return_value="/Users/test")
+    mocker.patch("os.path.expanduser", side_effect=_fake_expanduser("/Users/test"))
     mocker.patch("os.path.realpath", side_effect=lambda p: p)
     result = run_container("debian", env_file="/Users/test/.env")
     assert result["status"] == "ok"
@@ -1331,7 +1425,7 @@ def test_run_container_with_env_file(mocker):
 
 
 def test_run_container_env_file_outside_home_blocked(mocker):
-    mocker.patch("os.path.expanduser", return_value="/Users/test")
+    mocker.patch("os.path.expanduser", side_effect=_fake_expanduser("/Users/test"))
     mocker.patch("os.path.realpath", side_effect=lambda p: p)
     result = run_container("debian", env_file="/etc/passwd")
     assert result["status"] == "error"
@@ -1340,7 +1434,7 @@ def test_run_container_env_file_outside_home_blocked(mocker):
 
 def test_run_container_env_file_sibling_prefix_blocked(mocker):
     """Ensure /Users/tester/.env doesn't pass when home is /Users/test."""
-    mocker.patch("os.path.expanduser", return_value="/Users/test")
+    mocker.patch("os.path.expanduser", side_effect=_fake_expanduser("/Users/test"))
     mocker.patch("os.path.realpath", side_effect=lambda p: p)
     result = run_container("debian", env_file="/Users/tester/.env")
     assert result["status"] == "error"
@@ -1355,3 +1449,230 @@ def test_run_container_with_mount(mocker):
     called_args = mock.call_args[0][0]
     assert "--mount" in called_args
     assert "type=bind,src=/tmp,dst=/data" in called_args
+
+
+# ---------------------------------------------------------------------------
+# _validate_home_path — shared host-path boundary helper
+# ---------------------------------------------------------------------------
+
+
+def test_validate_home_path_accepts_home_subpath():
+    import os
+    from apple_container_mcp.tools import _validate_home_path
+
+    home = os.path.realpath(os.path.expanduser("~"))
+    assert _validate_home_path(os.path.join(home, "project")) is None
+
+
+def test_validate_home_path_rejects_outside_home():
+    from apple_container_mcp.tools import _validate_home_path
+
+    msg = _validate_home_path("/etc/passwd")
+    assert msg is not None
+    assert "home directory" in msg
+
+
+def test_validate_home_path_rejects_sibling_prefix():
+    """Guard against /Users/joe matching /Users/joey via prefix."""
+    import os
+    from apple_container_mcp.tools import _validate_home_path
+
+    home = os.path.realpath(os.path.expanduser("~"))
+    assert _validate_home_path(home + "extra") is not None
+
+
+# ---------------------------------------------------------------------------
+# files — host<->container copy tools (container cp)
+# ---------------------------------------------------------------------------
+
+
+def test_copy_to_container_builds_command(mocker):
+    import os
+    from apple_container_mcp.tools import files
+
+    mock_cmd = mocker.patch.object(files, "_run_container_cmd", return_value={})
+    src = os.path.join(os.path.expanduser("~"), "data.txt")
+
+    result = files.copy_to_container(src, "web", "/app/data.txt")
+
+    assert result["status"] == "ok"
+    args = mock_cmd.call_args[0][0]
+    assert args == ["cp", src, "web:/app/data.txt"]
+
+
+def test_copy_to_container_rejects_source_outside_home(mocker):
+    from apple_container_mcp.tools import files
+
+    mock_cmd = mocker.patch.object(files, "_run_container_cmd")
+
+    result = files.copy_to_container("/etc/passwd", "web", "/tmp/x")
+
+    assert result["status"] == "error"
+    assert "home directory" in result["message"]
+    mock_cmd.assert_not_called()
+
+
+def test_copy_from_container_builds_command(mocker):
+    import os
+    from apple_container_mcp.tools import files
+
+    mock_cmd = mocker.patch.object(files, "_run_container_cmd", return_value={})
+    dest = os.path.join(os.path.expanduser("~"), "out.txt")
+
+    result = files.copy_from_container("web", "/app/out.txt", dest)
+
+    assert result["status"] == "ok"
+    args = mock_cmd.call_args[0][0]
+    assert args == ["cp", "web:/app/out.txt", dest]
+
+
+def test_copy_from_container_rejects_dest_outside_home(mocker):
+    from apple_container_mcp.tools import files
+
+    mock_cmd = mocker.patch.object(files, "_run_container_cmd")
+
+    result = files.copy_from_container("web", "/app/out.txt", "/etc/evil")
+
+    assert result["status"] == "error"
+    assert "home directory" in result["message"]
+    mock_cmd.assert_not_called()
+
+
+def test_create_machine_builds_command(mocker):
+    from apple_container_mcp.tools import machines
+
+    mock_cmd = mocker.patch.object(machines, "_run_container_cmd", return_value={})
+
+    result = machines.create_machine("alpine:3.22", name="m1", cpus=4, memory="8G", home_mount="ro", set_default=True)
+
+    assert result["status"] == "ok"
+    args = mock_cmd.call_args[0][0]
+    assert args[:2] == ["machine", "create"]
+    assert "--name" in args and "m1" in args
+    assert "--cpus" in args and "4" in args
+    assert "--memory" in args and "8G" in args
+    assert "--home-mount" in args and "ro" in args
+    assert "--set-default" in args
+    assert args[-1] == "alpine:3.22"
+
+
+def test_list_machines_ok(mocker):
+    from apple_container_mcp.tools import machines
+
+    mocker.patch.object(machines, "_run_container_cmd", return_value=[{"name": "m1"}])
+
+    result = machines.list_machines()
+    assert result["status"] == "ok"
+    assert result["machines"] == [{"name": "m1"}]
+    assert result["count"] == 1
+
+
+def test_run_machine_builds_command(mocker):
+    from apple_container_mcp.tools import machines
+
+    mock_cmd = mocker.patch.object(machines, "_run_container_cmd", return_value={"raw_output": "linux"})
+
+    result = machines.run_machine(["uname", "-a"], name="m1")
+
+    assert result["status"] == "ok"
+    args = mock_cmd.call_args[0][0]
+    assert args[:2] == ["machine", "run"]
+    assert "-n" in args and "m1" in args
+    assert args[-2:] == ["uname", "-a"]
+
+
+def test_inspect_machine_default(mocker):
+    from apple_container_mcp.tools import machines
+
+    mock_cmd = mocker.patch.object(machines, "_run_container_cmd", return_value={"name": "default"})
+
+    result = machines.inspect_machine()
+    assert result["status"] == "ok"
+    assert mock_cmd.call_args[0][0] == ["machine", "inspect"]
+
+
+def test_set_machine_builds_settings(mocker):
+    from apple_container_mcp.tools import machines
+
+    mock_cmd = mocker.patch.object(machines, "_run_container_cmd", return_value={})
+
+    result = machines.set_machine(name="m1", cpus=2, memory="4G", home_mount="rw")
+    assert result["status"] == "ok"
+    args = mock_cmd.call_args[0][0]
+    assert args[:2] == ["machine", "set"]
+    assert "-n" in args and "m1" in args
+    assert "cpus=2" in args
+    assert "memory=4G" in args
+    assert "home-mount=rw" in args
+
+
+def test_set_default_machine(mocker):
+    from apple_container_mcp.tools import machines
+
+    mock_cmd = mocker.patch.object(machines, "_run_container_cmd", return_value={})
+
+    result = machines.set_default_machine("m1")
+    assert result["status"] == "ok"
+    assert mock_cmd.call_args[0][0] == ["machine", "set-default", "m1"]
+
+
+def test_machine_logs_with_boot_and_limit(mocker):
+    from apple_container_mcp.tools import machines
+
+    mock_cmd = mocker.patch.object(machines, "_run_container_cmd", return_value={"raw_output": "log"})
+
+    result = machines.machine_logs(name="m1", boot=True, limit=50)
+    assert result["status"] == "ok"
+    args = mock_cmd.call_args[0][0]
+    assert args[0:2] == ["machine", "logs"]
+    assert "--boot" in args
+    assert "-n" in args and "50" in args
+    assert args[-1] == "m1"
+
+
+def test_stop_machine_default(mocker):
+    from apple_container_mcp.tools import machines
+
+    mock_cmd = mocker.patch.object(machines, "_run_container_cmd", return_value={})
+
+    result = machines.stop_machine()
+    assert result["status"] == "ok"
+    assert mock_cmd.call_args[0][0] == ["machine", "stop"]
+
+
+def test_delete_machine(mocker):
+    from apple_container_mcp.tools import machines
+
+    mock_cmd = mocker.patch.object(machines, "_run_container_cmd", return_value={})
+
+    result = machines.delete_machine("m1")
+    assert result["status"] == "ok"
+    assert mock_cmd.call_args[0][0] == ["machine", "delete", "m1"]
+
+
+def test_copy_to_container_expands_tilde_source(mocker):
+    import os
+    from apple_container_mcp.tools import files
+
+    mock_cmd = mocker.patch.object(files, "_run_container_cmd", return_value={})
+
+    result = files.copy_to_container("~/data.txt", "web", "/app/data.txt")
+
+    assert result["status"] == "ok"
+    expanded = os.path.join(os.path.expanduser("~"), "data.txt")
+    args = mock_cmd.call_args[0][0]
+    assert args == ["cp", expanded, "web:/app/data.txt"]
+
+
+def test_copy_from_container_expands_tilde_dest(mocker):
+    import os
+    from apple_container_mcp.tools import files
+
+    mock_cmd = mocker.patch.object(files, "_run_container_cmd", return_value={})
+
+    result = files.copy_from_container("web", "/app/out.txt", "~/out.txt")
+
+    assert result["status"] == "ok"
+    expanded = os.path.join(os.path.expanduser("~"), "out.txt")
+    args = mock_cmd.call_args[0][0]
+    assert args == ["cp", "web:/app/out.txt", expanded]
