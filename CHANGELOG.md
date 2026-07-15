@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - 2026-07-14
+
+### Added
+
+- Apple Container 1.1 support (validated against the 1.1.0 command reference and
+  release notes; the minimum supported CLI version remains 1.0.0 — 1.1 introduced
+  no breaking changes).
+- Nested virtualization on container machines: `virtualization` parameter on
+  create_machine (`--virtualization`) and set_machine (`virtualization=<bool>`).
+  Both are version-gated with a clear error when the installed CLI is older
+  than 1.1. Requires Apple Silicon M3+, macOS 15+, and a guest kernel built
+  with CONFIG_KVM=y.
+- CLI version probe now captures (major, minor) so tools can gate on minor
+  releases.
+
+### Changed
+
+- copy_to_container / copy_from_container resolve host paths to absolute paths
+  (realpath) before invoking `container cp`, sidestepping the 1.0.0 CLI bug with
+  relative host paths (fixed upstream in 1.1.0).
+
+### Notes
+
+- The 1.1 kernel override (`machine create --kernel`, `machine set kernel=`) is
+  deliberately NOT exposed: loading an arbitrary host path as guest kernel code
+  is the same privilege-escalation vector as run's `--kernel`, which remains
+  blocklisted. See docs/TDD.md "Security Model".
+- `--stop-signal` is still absent from `container run` in the 1.1.0 binary's
+  command reference; it remains unexposed.
+- The full 1.0 → 1.1 CLI delta was audited via the command-reference diff; the
+  machine virtualization/kernel options are the only additions. All other 1.1.0
+  changes are behavioral fixes (unix socket mounts in non-root containers,
+  cp relative paths, exec empty-argument crash).
+
 ## [0.3.0] - 2026-06-09
 
 ### Added

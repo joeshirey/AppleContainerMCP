@@ -217,7 +217,7 @@ def test_run_container_cmd_builder_ls_no_longer_in_allowlist(mocker):
 def test_detect_cli_major_version_parses_version_string(mocker):
     from apple_container_mcp import cli_wrapper
 
-    cli_wrapper._detect_cli_major_version.cache_clear()
+    cli_wrapper._detect_cli_version.cache_clear()
     mock_run = mocker.patch("subprocess.run")
     mock_result = mocker.Mock()
     mock_result.stdout = "container CLI version 1.0.0 (build: release, commit: unspeci)"
@@ -227,19 +227,34 @@ def test_detect_cli_major_version_parses_version_string(mocker):
     assert cli_wrapper._detect_cli_major_version() == 1
 
 
-def test_detect_cli_major_version_returns_none_when_missing(mocker):
+def test_detect_cli_version_parses_major_and_minor(mocker):
     from apple_container_mcp import cli_wrapper
 
-    cli_wrapper._detect_cli_major_version.cache_clear()
+    cli_wrapper._detect_cli_version.cache_clear()
+    mock_run = mocker.patch("subprocess.run")
+    mock_result = mocker.Mock()
+    mock_result.stdout = "container CLI version 1.1.0 (build: release, commit: unspeci)"
+    mock_result.returncode = 0
+    mock_run.return_value = mock_result
+
+    assert cli_wrapper._detect_cli_version() == (1, 1)
+    assert cli_wrapper._detect_cli_major_version() == 1
+
+
+def test_detect_cli_version_returns_none_when_missing(mocker):
+    from apple_container_mcp import cli_wrapper
+
+    cli_wrapper._detect_cli_version.cache_clear()
     mocker.patch("subprocess.run", side_effect=FileNotFoundError())
 
+    assert cli_wrapper._detect_cli_version() is None
     assert cli_wrapper._detect_cli_major_version() is None
 
 
 def test_detect_cli_major_version_returns_none_on_unparseable(mocker):
     from apple_container_mcp import cli_wrapper
 
-    cli_wrapper._detect_cli_major_version.cache_clear()
+    cli_wrapper._detect_cli_version.cache_clear()
     mock_run = mocker.patch("subprocess.run")
     mock_result = mocker.Mock()
     mock_result.stdout = "garbage output"

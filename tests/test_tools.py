@@ -1606,6 +1606,112 @@ def test_set_machine_builds_settings(mocker):
     assert "home-mount=rw" in args
 
 
+def test_create_machine_virtualization_flag(mocker):
+    from apple_container_mcp.tools import machines
+
+    mocker.patch.object(machines, "_detect_cli_version", return_value=(1, 1))
+    mock_cmd = mocker.patch.object(machines, "_run_container_cmd", return_value={})
+
+    result = machines.create_machine("alpine:3.22", virtualization=True)
+
+    assert result["status"] == "ok"
+    args = mock_cmd.call_args[0][0]
+    assert "--virtualization" in args
+    assert args[-1] == "alpine:3.22"
+
+
+def test_create_machine_virtualization_requires_1_1(mocker):
+    from apple_container_mcp.tools import machines
+
+    mocker.patch.object(machines, "_detect_cli_version", return_value=(1, 0))
+    mock_cmd = mocker.patch.object(machines, "_run_container_cmd")
+
+    result = machines.create_machine("alpine:3.22", virtualization=True)
+
+    assert result["status"] == "error"
+    assert "1.1+" in result["message"]
+    mock_cmd.assert_not_called()
+
+
+def test_create_machine_virtualization_proceeds_on_unknown_version(mocker):
+    from apple_container_mcp.tools import machines
+
+    # Undetectable version → don't block; the CLI reports unsupported flags itself.
+    mocker.patch.object(machines, "_detect_cli_version", return_value=None)
+    mock_cmd = mocker.patch.object(machines, "_run_container_cmd", return_value={})
+
+    result = machines.create_machine("alpine:3.22", virtualization=True)
+
+    assert result["status"] == "ok"
+    assert "--virtualization" in mock_cmd.call_args[0][0]
+
+
+def test_create_machine_no_virtualization_skips_version_probe(mocker):
+    from apple_container_mcp.tools import machines
+
+    probe = mocker.patch.object(machines, "_detect_cli_version")
+    mock_cmd = mocker.patch.object(machines, "_run_container_cmd", return_value={})
+
+    result = machines.create_machine("alpine:3.22")
+
+    assert result["status"] == "ok"
+    assert "--virtualization" not in mock_cmd.call_args[0][0]
+    probe.assert_not_called()
+
+
+def test_set_machine_virtualization_kwarg(mocker):
+    from apple_container_mcp.tools import machines
+
+    mocker.patch.object(machines, "_detect_cli_version", return_value=(1, 2))
+    mock_cmd = mocker.patch.object(machines, "_run_container_cmd", return_value={})
+
+    result = machines.set_machine(name="m1", virtualization=False)
+
+    assert result["status"] == "ok"
+    args = mock_cmd.call_args[0][0]
+    assert "virtualization=false" in args
+
+
+def test_set_machine_virtualization_requires_1_1(mocker):
+    from apple_container_mcp.tools import machines
+
+    mocker.patch.object(machines, "_detect_cli_version", return_value=(1, 0))
+    mock_cmd = mocker.patch.object(machines, "_run_container_cmd")
+
+    result = machines.set_machine(virtualization=True)
+
+    assert result["status"] == "error"
+    assert "1.1+" in result["message"]
+    mock_cmd.assert_not_called()
+
+
+def test_copy_to_container_resolves_source_to_absolute(mocker):
+    import os
+    from apple_container_mcp.tools import files
+
+    mock_cmd = mocker.patch.object(files, "_run_container_cmd", return_value={})
+    # A home-relative path with a redundant segment must reach the CLI as a
+    # clean absolute path (container cp 1.0.0 mishandled relative host paths).
+    result = files.copy_to_container("~/subdir/../data.txt", "web", "/app/data.txt")
+
+    assert result["status"] == "ok"
+    expected = os.path.realpath(os.path.expanduser("~/data.txt"))
+    assert mock_cmd.call_args[0][0] == ["cp", expected, "web:/app/data.txt"]
+
+
+def test_copy_from_container_resolves_dest_to_absolute(mocker):
+    import os
+    from apple_container_mcp.tools import files
+
+    mock_cmd = mocker.patch.object(files, "_run_container_cmd", return_value={})
+
+    result = files.copy_from_container("web", "/app/out.txt", "~/subdir/../out.txt")
+
+    assert result["status"] == "ok"
+    expected = os.path.realpath(os.path.expanduser("~/out.txt"))
+    assert mock_cmd.call_args[0][0] == ["cp", "web:/app/out.txt", expected]
+
+
 def test_set_default_machine(mocker):
     from apple_container_mcp.tools import machines
 
