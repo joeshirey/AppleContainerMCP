@@ -47,6 +47,16 @@ mcp = FastMCP("apple-container-mcp")
 #   Forwards the host's SSH agent socket into the container. Any process
 #   inside the container can use the user's SSH credentials silently. This
 #   is a credential-leak vector and is blocked from LLM-driven invocations.
+#
+# machine create --kernel / machine set kernel= (Apple Container 1.1 audit finding):
+#   Container 1.1 added a custom-kernel override to `machine create`/`machine set`
+#   with the same privilege-escalation character as run's --kernel: the daemon
+#   loads an arbitrary host filesystem path as guest kernel code. The machine
+#   tools build their CLI arguments from typed parameters only (no passthrough),
+#   so no blocklist entry is required — the kernel override is deliberately NOT
+#   exposed as a tool parameter. Do not add it. Nested virtualization
+#   (--virtualization / virtualization=<bool>) IS exposed: it grants the guest
+#   VM capabilities but no access to host resources.
 _DANGEROUS_FLAGS: frozenset[str] = frozenset(
     {
         "--privileged",

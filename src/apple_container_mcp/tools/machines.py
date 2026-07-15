@@ -2,7 +2,29 @@
 
 from typing import Dict, Any, List, Optional
 
+from ..cli_wrapper import _detect_cli_version
 from . import mcp, _DESTRUCTIVE, _normalize_list_result, _run_container_cmd, ContainerCLIError
+
+
+def _virtualization_version_error() -> "Dict[str, Any] | None":
+    """
+    Return an error dict if the installed CLI is a known version older than 1.1
+    (which introduced machine nested virtualization), otherwise None.
+
+    When the version cannot be detected, None is returned and the CLI itself
+    reports any unsupported-flag error.
+    """
+    version = _detect_cli_version()
+    if version is not None and version < (1, 1):
+        return {
+            "status": "error",
+            "message": (
+                f"Machine nested virtualization requires Apple Container CLI 1.1+, but "
+                f"{version[0]}.{version[1]}.x is installed. Upgrade via Homebrew or "
+                f"https://github.com/apple/container/releases."
+            ),
+        }
+    return None
 
 
 @mcp.tool()
@@ -14,12 +36,20 @@ def create_machine(
     home_mount: Optional[str] = None,
     set_default: bool = False,
     no_boot: bool = False,
+    virtualization: bool = False,
 ) -> Dict[str, Any]:
     """
     Create and boot a container machine (a persistent Linux environment) from an image.
     home_mount is one of 'ro', 'rw', 'none'.
+    Set virtualization=True to enable nested virtualization (requires Apple Container 1.1+,
+    Apple Silicon M3+, macOS 15+, and a guest kernel built with CONFIG_KVM=y).
     Example: create_machine("alpine:3.22", name="dev", cpus=4, memory="8G")
     """
+    if virtualization:
+        version_error = _virtualization_version_error()
+        if version_error:
+            return version_error
+
     args = ["machine", "create"]
     if name:
         args.extend(["--name", name])
@@ -33,6 +63,8 @@ def create_machine(
         args.append("--set-default")
     if no_boot:
         args.append("--no-boot")
+    if virtualization:
+        args.append("--virtualization")
     args.append(image)
     try:
         _run_container_cmd(args)
@@ -109,11 +141,19 @@ def set_machine(
     cpus: Optional[int] = None,
     memory: Optional[str] = None,
     home_mount: Optional[str] = None,
+    virtualization: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """
     Set container machine configuration (takes effect after restart). home_mount is one
-    of 'ro', 'rw', 'none'. Applies to the default machine if name is omitted.
+    of 'ro', 'rw', 'none'. virtualization toggles nested virtualization (requires Apple
+    Container 1.1+, Apple Silicon M3+, macOS 15+, and a guest kernel with CONFIG_KVM=y).
+    Applies to the default machine if name is omitted.
     """
+    if virtualization is not None:
+        version_error = _virtualization_version_error()
+        if version_error:
+            return version_error
+
     args = ["machine", "set"]
     if name:
         args.extend(["-n", name])
@@ -123,6 +163,8 @@ def set_machine(
         args.append(f"memory={memory}")
     if home_mount:
         args.append(f"home-mount={home_mount}")
+    if virtualization is not None:
+        args.append(f"virtualization={'true' if virtualization else 'false'}")
     try:
         _run_container_cmd(args)
         return {"status": "ok", "message": "Updated container machine configuration."}

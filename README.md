@@ -15,7 +15,7 @@ By acting as an MCP Server, this tool abstracts away the complexity of specific 
    brew install uv
    ```
 
-3. **Apple Container CLI**: Provided by Apple's virtualization framework. **Requires container CLI 1.0+** (Apple Silicon and macOS 26 recommended). Install via Homebrew, then start the system service:
+3. **Apple Container CLI**: Provided by Apple's virtualization framework. **Requires container CLI 1.0+; validated against 1.1.0** (Apple Silicon and macOS 26 recommended). Install via Homebrew, then start the system service:
 
    ```bash
    brew install container
@@ -275,7 +275,7 @@ Once the MCP server is configured in your LLM client, you can use natural langua
 - **System**: `check_apiserver_status`, `start_system`, `stop_system`, `system_status`, `system_version`, `system_property_list`, `check_environment`
 - **Containers**: `run_container` (supports `--init-image`, rosetta, platform, labels, `shm_size`, and more), `list_containers`, `start_container`, `stop_container`, `remove_container`, `export_container`, `inspect_container`, `exec_in_container`, `get_logs`, `prune_containers`, `stats_container`
 - **Files**: `copy_to_container`, `copy_from_container`
-- **Machines**: `create_machine`, `run_machine`, `list_machines`, `inspect_machine`, `set_machine`, `set_default_machine`, `machine_logs`, `stop_machine`, `delete_machine`
+- **Machines**: `create_machine` (supports nested virtualization on container 1.1+), `run_machine`, `list_machines`, `inspect_machine`, `set_machine`, `set_default_machine`, `machine_logs`, `stop_machine`, `delete_machine`
 - **Images**: `list_images`, `pull_image`, `build_image`, `check_build_status`, `list_builds`, `tag_image`, `push_image`, `inspect_image`, `remove_image`, `prune_images`
 - **Networks**: `create_network`, `remove_network`, `list_networks`, `inspect_network`, `prune_networks`
 - **Volumes**: `create_volume`, `remove_volume`, `list_volumes`, `inspect_volume`, `prune_volumes`

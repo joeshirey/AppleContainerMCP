@@ -39,10 +39,10 @@ MINIMUM_CLI_MAJOR_VERSION = 1
 
 
 @functools.lru_cache(maxsize=1)
-def _detect_cli_major_version() -> Optional[int]:
+def _detect_cli_version() -> Optional[tuple[int, int]]:
     """
-    Return the installed `container` CLI major version as an int, or None if the
-    binary is missing or its version output cannot be parsed.
+    Return the installed `container` CLI version as a (major, minor) tuple, or None
+    if the binary is missing or its version output cannot be parsed.
 
     Cached for the process lifetime so we shell out at most once. Daemon-independent:
     `container --version` works whether or not the apiserver is running.
@@ -51,10 +51,16 @@ def _detect_cli_major_version() -> Optional[int]:
         proc = subprocess.run(["container", "--version"], capture_output=True, text=True, timeout=10)
     except (FileNotFoundError, OSError, subprocess.SubprocessError):
         return None
-    match = re.search(r"version\s+(\d+)\.\d+\.\d+", proc.stdout)
+    match = re.search(r"version\s+(\d+)\.(\d+)\.\d+", proc.stdout)
     if not match:
         return None
-    return int(match.group(1))
+    return (int(match.group(1)), int(match.group(2)))
+
+
+def _detect_cli_major_version() -> Optional[int]:
+    """Return the installed CLI major version, or None if undetectable."""
+    version = _detect_cli_version()
+    return version[0] if version is not None else None
 
 
 def version_warning(major: Optional[int] = None) -> Optional[str]:
