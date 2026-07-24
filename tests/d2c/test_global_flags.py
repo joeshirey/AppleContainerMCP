@@ -69,19 +69,19 @@ def test_multiple_global_flags() -> None:
     assert "ps" in remaining
 
 
-def test_prompt_continue_yes(monkeypatch: object) -> None:
+def test_prompt_continue_yes() -> None:
     with patch("builtins.input", return_value="y"):
         result = prompt_continue("--host", "some hint")
     assert result is True
 
 
-def test_prompt_continue_no(monkeypatch: object) -> None:
+def test_prompt_continue_no() -> None:
     with patch("builtins.input", return_value="n"):
         result = prompt_continue("--host", "some hint")
     assert result is False
 
 
-def test_prompt_continue_empty_defaults_no(monkeypatch: object) -> None:
+def test_prompt_continue_empty_defaults_no() -> None:
     with patch("builtins.input", return_value=""):
         result = prompt_continue("--host", "some hint")
     assert result is False
@@ -90,3 +90,17 @@ def test_prompt_continue_empty_defaults_no(monkeypatch: object) -> None:
 def test_all_global_flags_have_hints() -> None:
     for flag, gf in GLOBAL_FLAGS.items():
         assert gf.hint.strip(), f"hint for '{flag}' is empty"
+
+
+def test_equals_form_puts_bare_flag_name_in_warned() -> None:
+    remaining, warned, prepend = strip_global_flags(["--host=tcp://remote:2375", "ps"])
+    assert warned == ["--host"]   # not "--host=tcp://remote:2375"
+    assert "ps" in remaining
+
+
+def test_short_flags_in_exec_args_not_consumed() -> None:
+    remaining, warned, prepend = strip_global_flags(
+        ["exec", "mycontainer", "bash", "-c", "echo hi"]
+    )
+    assert warned == []
+    assert remaining == ["exec", "mycontainer", "bash", "-c", "echo hi"]

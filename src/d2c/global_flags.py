@@ -66,6 +66,11 @@ TRANSLATABLE_GLOBAL_FLAGS: dict[str, list[str]] = {
 def strip_global_flags(args: list[str]) -> tuple[list[str], list[str], list[str]]:
     """Separate Docker global flags from command args.
 
+    Only scans until the first positional (non-flag) argument — Docker global
+    flags are only valid before the subcommand. This prevents short flags like
+    -c and -l from being incorrectly stripped when they appear in subcommand args
+    (e.g. 'exec mycontainer bash -c "echo hi"').
+
     Returns (remaining_args, warned_flags, prepend_flags) where:
     - remaining_args: args with Docker global flags removed
     - warned_flags: flag names that need user confirmation
@@ -77,6 +82,12 @@ def strip_global_flags(args: list[str]) -> tuple[list[str], list[str], list[str]
     i = 0
     while i < len(args):
         arg = args[i]
+
+        # Stop scanning at the first positional arg — global flags only come before subcommand
+        if not arg.startswith("-"):
+            remaining.extend(args[i:])
+            break
+
         bare = arg.split("=")[0]
 
         if bare in GLOBAL_FLAGS:
