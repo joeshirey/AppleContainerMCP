@@ -1,3 +1,5 @@
+import dataclasses
+
 from d2c.unsupported import UNSUPPORTED
 
 
@@ -29,8 +31,9 @@ def test_attach_hint_mentions_exec() -> None:
     assert "exec" in UNSUPPORTED["attach"].hint
 
 
-def test_rename_hint_mentions_recreate() -> None:
-    assert "recreate" in UNSUPPORTED["rename"].hint or "remove" in UNSUPPORTED["rename"].hint
+def test_rename_hint_mentions_remove_and_recreate() -> None:
+    hint = UNSUPPORTED["rename"].hint
+    assert "remove" in hint and "recreate" in hint
 
 
 def test_restart_hint_mentions_stop_and_start() -> None:
@@ -50,3 +53,18 @@ def test_swarm_commands_unsupported() -> None:
 def test_all_hints_are_nonempty() -> None:
     for cmd, entry in UNSUPPORTED.items():
         assert entry.hint.strip(), f"hint for '{cmd}' is empty"
+
+
+def test_unsupported_command_is_immutable() -> None:
+    import pytest
+
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        UNSUPPORTED["commit"].hint = "changed"  # type: ignore[misc]
+
+
+def test_compose_is_unsupported() -> None:
+    assert "compose" in UNSUPPORTED
+
+
+def test_compose_hint_mentions_run() -> None:
+    assert "run" in UNSUPPORTED["compose"].hint

@@ -10,11 +10,14 @@ UNSUPPORTED: dict[str, UnsupportedCommand] = {
     "commit": UnsupportedCommand(
         hint="Build from a Dockerfile instead — Apple Container doesn't support creating images from running containers."
     ),
+    "compose": UnsupportedCommand(
+        hint="No equivalent — Apple Container has no orchestration layer. Run containers individually with 'container run'."
+    ),
     "diff": UnsupportedCommand(
         hint="No equivalent — use 'container exec' to inspect the filesystem manually."
     ),
     "events": UnsupportedCommand(
-        hint="No equivalent in Apple Container."
+        hint="No equivalent — use 'container logs <name>' for output or 'container inspect <name>' for state changes."
     ),
     "history": UnsupportedCommand(
         hint="No equivalent — check your Dockerfile for layer history."
@@ -44,16 +47,16 @@ UNSUPPORTED: dict[str, UnsupportedCommand] = {
         hint="No equivalent — use 'container exec -it <name> /bin/sh' to get an interactive shell."
     ),
     "wait": UnsupportedCommand(
-        hint="No equivalent in Apple Container."
+        hint="No equivalent — poll with 'container inspect <name>' and check the container state."
     ),
     "manifest": UnsupportedCommand(
-        hint="No equivalent in Apple Container."
+        hint="No equivalent — use 'container image inspect <image>' for local image metadata."
     ),
     "checkpoint": UnsupportedCommand(
-        hint="Not applicable to Apple Container."
+        hint="No equivalent — Apple Container doesn't support container checkpointing."
     ),
     "context": UnsupportedCommand(
-        hint="Apple Container has no context switching."
+        hint="No equivalent — Apple Container has no context switching; it always uses the local system service."
     ),
     # Swarm commands
     "node": UnsupportedCommand(
@@ -75,6 +78,6 @@ UNSUPPORTED: dict[str, UnsupportedCommand] = {
         hint="Docker Swarm commands are not applicable to Apple Container."
     ),
     "plugin": UnsupportedCommand(
-        hint="Not applicable to Apple Container."
+        hint="No equivalent — Apple Container has no plugin system."
     ),
 }
