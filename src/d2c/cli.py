@@ -41,7 +41,7 @@ def main() -> None:
     try:
         container_args, note = translate(args)
     except KeyError:
-        print(f"d2c: unknown command '{args[0]}'")
+        print(f"d2c: unknown command '{effective_cmd}'")
         sys.exit(1)
 
     # Insert translated global flags (e.g. --debug) after 'container'

@@ -115,5 +115,9 @@ def prompt_continue(flag: str, hint: str) -> bool:
     """
     print(f"⚠  '{flag}' is not supported by Apple Container.")
     print(f"   {hint}")
-    answer = input("   Continue anyway? [y/N] ").strip().lower()
+    try:
+        answer = input("   Continue anyway? [y/N] ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return False
     return answer == "y"
