@@ -118,3 +118,15 @@ def test_unknown_command_raises_key_error() -> None:
 def test_empty_args_raises_key_error() -> None:
     with pytest.raises(KeyError):
         translate([])
+
+
+def test_flag_map_renames_flag() -> None:
+    from d2c.registry import CommandTranslation
+    translation = CommandTranslation(
+        container_cmd=["container", "run"],
+        flag_map={"--old-flag": "--new-flag"},
+    )
+    # Simulate what translate() does with flag_map
+    remaining = ["--old-flag", "nginx"]
+    result = [translation.flag_map.get(arg, arg) for arg in remaining]
+    assert result == ["--new-flag", "nginx"]

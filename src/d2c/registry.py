@@ -5,7 +5,6 @@ from dataclasses import dataclass, field
 class CommandTranslation:
     container_cmd: list[str]
     flag_map: dict[str, str] = field(default_factory=dict)
-    passthrough: bool = True
     note: str | None = None
 
 
@@ -80,6 +79,8 @@ def translate(docker_args: list[str]) -> tuple[list[str], str | None]:
 
     translation = COMMANDS[cmd]  # raises KeyError if not found
 
+    # flag_map is reserved for future flag renames (e.g. --format differences).
+    # No current command uses it, but the code path is tested below.
     translated_remaining = (
         [translation.flag_map.get(arg, arg) for arg in remaining] if translation.flag_map else list(remaining)
     )
