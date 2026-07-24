@@ -18,9 +18,10 @@ build-backend = "hatchling.build"
 
 [project.scripts]
 apple-container-mcp = "apple_container_mcp.server:main"
+d2c = "d2c.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/apple_container_mcp"]
+packages = ["src/apple_container_mcp", "src/d2c"]
 
 [dependency-groups]
 dev = [
