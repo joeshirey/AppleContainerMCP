@@ -94,13 +94,11 @@ def test_all_global_flags_have_hints() -> None:
 
 def test_equals_form_puts_bare_flag_name_in_warned() -> None:
     remaining, warned, prepend = strip_global_flags(["--host=tcp://remote:2375", "ps"])
-    assert warned == ["--host"]   # not "--host=tcp://remote:2375"
+    assert warned == ["--host"]  # not "--host=tcp://remote:2375"
     assert "ps" in remaining
 
 
 def test_short_flags_in_exec_args_not_consumed() -> None:
-    remaining, warned, prepend = strip_global_flags(
-        ["exec", "mycontainer", "bash", "-c", "echo hi"]
-    )
+    remaining, warned, prepend = strip_global_flags(["exec", "mycontainer", "bash", "-c", "echo hi"])
     assert warned == []
     assert remaining == ["exec", "mycontainer", "bash", "-c", "echo hi"]

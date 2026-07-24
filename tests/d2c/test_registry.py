@@ -122,6 +122,7 @@ def test_empty_args_raises_key_error() -> None:
 
 def test_flag_map_renames_flag() -> None:
     from d2c.registry import CommandTranslation
+
     translation = CommandTranslation(
         container_cmd=["container", "run"],
         flag_map={"--old-flag": "--new-flag"},
