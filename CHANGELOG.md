@@ -5,6 +5,67 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2026-07-29
+
+### Added
+
+- Apple Container 1.2 support, validated against the installed 1.2.0 binary. The
+  minimum supported CLI version remains 1.0.0; 1.2 introduced no breaking changes.
+- `system_df` tool wrapping `container system df`. Reports per-category disk usage
+  (images, containers, volumes) with reclaimable byte counts, so cleanup decisions
+  are informed rather than blind. `("system", "df")` added to the `--format json`
+  allowlist after verifying the output shape on 1.2.0.
+- `system_logs` tool wrapping `container system logs --last <window>`. Reads logs
+  from the `container` system services rather than from a single container, for
+  diagnosing a daemon that will not start. Always non-streaming (`--follow` would
+  block until the subprocess timeout killed it), and `last` is validated against
+  `^\d+[mhd]?$` so no extra tokens can be smuggled into the argument list.
+- `check_environment` now reports the full `major.minor` version and recommends
+  upgrading when the installed CLI predates 1.2. This is an advisory only — the
+  hard version gate is unchanged.
+- Documentation for the `d2c` Docker translator, which shipped without any. The
+  README gains a usage section (dry-run, translated command coverage, unsupported
+  commands, global-flag handling); docs/PRD.md gains problem framing and
+  requirements DR1–DR4; docs/TDD.md gains a module breakdown and the rationale
+  behind the design decisions that are easy to undo by accident — checking
+  `UNSUPPORTED` before translating, stopping global-flag scanning at the first
+  positional, and defaulting the confirmation prompt to no.
+
+### Fixed
+
+- `d2c` translated `docker rmi` to `container image remove`, which is not a
+  subcommand; the CLI spells it `image delete` (alias `rm`) and rejected the call
+  with "2 unexpected arguments". The test asserted the broken mapping, so it never
+  went red. The MCP server's own `remove_image` tool was always correct.
+
+### Security
+
+- `--kernel-arg` (new in Apple Container 1.2) added to the `args_override`
+  blocklist. It appends raw arguments to the guest kernel command line, so a value
+  like `init=/bin/sh` subverts the VM before any container process starts. Same
+  class as `--kernel`, which was already blocked. It is also not exposed as a tool
+  parameter.
+
+### Notes
+
+- The 1.1 → 1.2 CLI delta contains exactly one new user-facing flag, `--kernel-arg`
+  on `run` and `create`. Everything else in the release is Swift API work (OCI
+  `maskedPaths` / `readonlyPaths`), upstream hardening (XPC container-ID
+  validation, kernel archive integrity, no symlink following when copying user
+  configuration), and test infrastructure.
+- Every existing `--format json` allowlist entry was re-run against the 1.2.0
+  binary and still emits parseable JSON. The version-probe regex still matches
+  1.2.0's `container CLI version 1.2.0` output.
+- The `args_override` blocklist is defense in depth, not the only barrier.
+  `args_override` is appended after the image name, and the CLI parses post-image
+  tokens as container init-process arguments rather than `run` options — verified
+  by observing that `container run <image> --totallyfakeflag` reaches image fetch
+  instead of erroring on an unknown option. The blocklist stays because that
+  positional behaviour is an undocumented implementation detail. The README and
+  docs/TDD.md now say so rather than implying the blocklist is load-bearing.
+- `system kernel set` and `system dns create` / `delete` remain unexposed: the
+  first is the `--kernel` vector again, the second requires administrator rights.
+
 ## [0.4.0] - 2026-07-14
 
 ### Added

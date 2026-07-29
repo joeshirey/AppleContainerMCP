@@ -4,6 +4,8 @@ The **Apple Container MCP Server** is a bridge between the Model Context Protoco
 
 By acting as an MCP Server, this tool abstracts away the complexity of specific CLI flags, networking mounts, and system-level configurations, letting the LLM inspect, analyze, and automatically run macOS container workflows on your behalf.
 
+The package installs two commands. `apple-container-mcp` is the MCP server described above. `d2c` is a standalone Docker-to-Apple-Container command translator for the terminal, with no LLM involved. See [`d2c` — Docker Command Translator](#-d2c--docker-command-translator) below.
+
 ---
 
 ## 🚀 Prerequisites
@@ -15,7 +17,7 @@ By acting as an MCP Server, this tool abstracts away the complexity of specific 
    brew install uv
    ```
 
-3. **Apple Container CLI**: Provided by Apple's virtualization framework. **Requires container CLI 1.0+; validated against 1.1.0** (Apple Silicon and macOS 26 recommended). Install via Homebrew, then start the system service:
+3. **Apple Container CLI**: Provided by Apple's virtualization framework. **Requires container CLI 1.0+; validated against 1.2.0, which is the recommended version** (Apple Silicon and macOS 26 recommended). 1.2.0 ships upstream security fixes — XPC request validation, kernel archive integrity checks, and no symlink following when copying user configuration — so `check_environment` will suggest upgrading if you are on an older 1.x. Install via Homebrew, then start the system service:
 
    ```bash
    brew install container
@@ -272,7 +274,7 @@ Once the MCP server is configured in your LLM client, you can use natural langua
 
 ### Tools Exposed
 
-- **System**: `check_apiserver_status`, `start_system`, `stop_system`, `system_status`, `system_version`, `system_property_list`, `check_environment`
+- **System**: `check_apiserver_status`, `start_system`, `stop_system`, `system_status`, `system_version`, `system_property_list`, `system_df`, `system_logs`, `check_environment`
 - **Containers**: `run_container` (supports `--init-image`, rosetta, platform, labels, `shm_size`, and more), `list_containers`, `start_container`, `stop_container`, `remove_container`, `export_container`, `inspect_container`, `exec_in_container`, `get_logs`, `prune_containers`, `stats_container`
 - **Files**: `copy_to_container`, `copy_from_container`
 - **Machines**: `create_machine` (supports nested virtualization on container 1.1+), `run_machine`, `list_machines`, `inspect_machine`, `set_machine`, `set_default_machine`, `machine_logs`, `stop_machine`, `delete_machine`
@@ -295,13 +297,85 @@ Once the MCP server is configured in your LLM client, you can use natural langua
 
 ---
 
+## 🔁 `d2c` — Docker Command Translator
+
+This package also installs a second, standalone command: `d2c`. It takes a Docker CLI invocation and runs the Apple Container equivalent, so muscle memory and existing shell scripts keep working without a rewrite. It has nothing to do with MCP and needs no LLM client — it is a plain terminal tool.
+
+### Usage
+
+```bash
+d2c [--dry-run] <docker-command> [args...]
+```
+
+If you installed via `uvx`, run it the same way you run the server:
+
+```bash
+uvx --from git+https://github.com/joeshirey/AppleContainerMCP.git d2c ps -a
+```
+
+From a local clone, `uv sync` puts `d2c` on your path inside the virtualenv. Many people alias it (`alias docker=d2c`) once they trust the translations.
+
+### See the translation before running it
+
+`--dry-run` prints what would run and exits without touching your system. Use it when you are unsure how a command maps:
+
+```console
+$ d2c --dry-run ps -a
+[d2c dry-run] docker ps -a
+           → container list -a
+
+$ d2c --dry-run rmi nginx
+[d2c dry-run] docker rmi nginx
+           → container image delete nginx
+           ℹ  'rmi' maps to Apple Container's 'image delete' subcommand
+```
+
+Without `--dry-run`, `d2c` executes the translated command and exits with that command's exit code, so it drops into scripts and CI cleanly.
+
+### What it translates
+
+Thirty Docker commands map onto Apple Container equivalents, covering container lifecycle (`ps`, `run`, `exec`, `stop`, `start`, `kill`, `rm`, `logs`, `inspect`, `cp`, `create`, `export`, `stats`), images (`images`, `pull`, `push`, `rmi`, `tag`, `build`, `load`, `save`), registry auth (`login`, `logout`), and the `network` / `volume` / `system` / `image` / `builder` management groups. Where a name differs enough to be surprising, the translation carries a note explaining the mapping.
+
+The Docker management namespace is stripped automatically, so `docker container run ubuntu` and `docker run ubuntu` both resolve to `container run ubuntu`.
+
+Flags after the command are passed through unchanged. `d2c` renames commands, not flags — a Docker flag with no Apple Container counterpart will be rejected by the `container` CLI rather than caught by `d2c`.
+
+### Commands with no equivalent
+
+Twenty-four Docker commands have no Apple Container counterpart. Rather than failing with a confusing CLI error, `d2c` refuses them up front and suggests what to do instead:
+
+```console
+$ d2c compose up
+✗  'docker compose' is not supported by Apple Container.
+   Hint: No equivalent — Apple Container has no orchestration layer. Run containers individually with 'container run'.
+```
+
+This covers the Swarm family (`service`, `stack`, `swarm`, `node`, `secret`, `config`), image operations Apple Container does not implement (`commit`, `import`, `history`, `manifest`, `search`), lifecycle gaps (`pause`, `unpause`, `restart`, `rename`, `attach`, `wait`, `port`, `diff`, `events`, `checkpoint`), plus `compose`, `context`, and `plugin`.
+
+### Docker global flags
+
+Global flags that come before the subcommand are handled separately. `--debug` / `-D` translates to `container --debug`. Flags that describe a world Apple Container does not have — remote daemons (`--host` / `-H`), context switching (`--context` / `-c`), TLS options, `--config`, `--log-level` / `-l` — trigger a warning and a confirmation prompt:
+
+```console
+$ d2c --host tcp://remote:2376 ps
+⚠  '--host' is not supported by Apple Container.
+   Apple Container connects to the local system service only — no remote daemon.
+   Continue anyway? [y/N]
+```
+
+Answering anything but `y` aborts. The prompt defaults to no and treats a closed stdin as no, so a script that inherits a stale `DOCKER_HOST`-style flag stops instead of silently running against the wrong target.
+
+Only flags appearing before the first positional argument are treated as global. `d2c exec mycontainer bash -c "echo hi"` keeps its `-c` where it belongs.
+
+---
+
 ## 🔒 Security Model
 
 This server applies several deliberate restrictions to keep LLM-driven container operations safe:
 
 - **Path validation:** `build_image`'s `context_path` and `run_container`'s `env_file` are restricted to paths inside your home directory. The check uses `os.path.realpath` and a trailing-separator suffix test to prevent prefix-match bypasses (e.g. `/Users/joe` vs `/Users/joey`). `copy_to_container` and `copy_from_container` apply the same policy: the HOST path is restricted to your home directory in both directions (`copy_to_container`'s `source` and `copy_from_container`'s `dest`).
-- **Argument blocklist:** `run_container`'s `args_override` parameter rejects flags that escalate privilege, weaken isolation, or expose host credentials: `--privileged`, `--cap-add`, `--cap-drop`, `--security-opt`, `--device`, `--pid`, `--ipc`, `--userns`, `--cgroupns`, `--no-new-privileges`, `--kernel` / `-k`, `--ssh`.
+- **Argument blocklist:** `run_container`'s `args_override` parameter rejects flags that escalate privilege, weaken isolation, or expose host credentials: `--privileged`, `--cap-add`, `--cap-drop`, `--security-opt`, `--device`, `--pid`, `--ipc`, `--userns`, `--cgroupns`, `--no-new-privileges`, `--kernel` / `-k`, `--kernel-arg`, `--ssh`. This is defense in depth rather than the only barrier: `args_override` is appended *after* the image name, and the CLI treats everything after the image as arguments to the container's init process, not as `run` options. A blocked flag that slipped through would reach the guest as a command argument, not as a privilege grant. The blocklist stays because that positional guarantee is a CLI implementation detail, not a documented contract.
 - **Linux capabilities (Apple Container 0.12+):** Container 0.12 promoted `--cap-add` / `--cap-drop` to documented public flags. **This MCP deliberately does NOT expose them as tool parameters.** Capability selection meaningfully weakens process isolation; if you need it, invoke `container run` directly. We may revisit this in a future release with an allowlist mechanism.
-- **`--kernel` and `--ssh` blocked:** `--kernel` (which loads an arbitrary host filesystem path as a guest kernel) is a privilege-escalation vector; `--ssh` (which forwards the host SSH agent socket into the container) is a credential-leak vector. Both are blocked from `args_override`.
+- **`--kernel`, `--kernel-arg`, and `--ssh` blocked:** `--kernel` loads an arbitrary host filesystem path as a guest kernel. `--kernel-arg` (added in Apple Container 1.2) appends raw arguments to the guest kernel command line, so a value like `init=/bin/sh` subverts the VM before any container process starts. `--ssh` forwards the host SSH agent socket into the container, letting anything inside use your credentials silently. All three are blocked from `args_override` and none is exposed as a tool parameter.
 - **No shell injection:** `subprocess.run` is always called with an argument list, never with `shell=True`.
 - **Credential handling:** `registry_login` passes the password via `stdin` (`--password-stdin`) so it never appears in process arguments.

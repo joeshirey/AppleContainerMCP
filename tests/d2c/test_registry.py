@@ -19,8 +19,10 @@ def test_images_translates_to_image_list() -> None:
 
 
 def test_rmi_translates_and_has_note() -> None:
+    # The Apple Container CLI spells this `image delete` (alias `rm`); there is no
+    # `image remove` subcommand — passing one fails with "unexpected arguments".
     args, note = translate(["rmi", "nginx"])
-    assert args == ["container", "image", "remove", "nginx"]
+    assert args == ["container", "image", "delete", "nginx"]
     assert note is not None
     assert len(note) > 0
 

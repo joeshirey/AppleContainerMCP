@@ -194,6 +194,35 @@ def test_run_container_cmd_v1_allowlist_entries_get_json_format(mocker, subcmd):
     assert "json" in called_cmd, f"json missing for {subcmd}"
 
 
+def test_run_container_cmd_system_df_gets_json_format(mocker):
+    """`container system df` supports --format json (verified against the 1.2.0 binary)."""
+    mock_run = mocker.patch("subprocess.run")
+    mock_result = mocker.Mock()
+    mock_result.stdout = "{}"
+    mock_result.returncode = 0
+    mock_run.return_value = mock_result
+
+    _run_container_cmd(["system", "df"])
+
+    called_cmd = mock_run.call_args[0][0]
+    assert "--format" in called_cmd
+    assert "json" in called_cmd
+
+
+def test_run_container_cmd_system_logs_not_in_allowlist(mocker):
+    """`container system logs` emits plain text; it must not get --format json."""
+    mock_run = mocker.patch("subprocess.run")
+    mock_result = mocker.Mock()
+    mock_result.stdout = "some log line"
+    mock_result.returncode = 0
+    mock_run.return_value = mock_result
+
+    _run_container_cmd(["system", "logs", "--last", "5m"])
+
+    called_cmd = mock_run.call_args[0][0]
+    assert "--format" not in called_cmd
+
+
 def test_run_container_cmd_builder_ls_no_longer_in_allowlist(mocker):
     """`container builder ls` does NOT exist in 0.12; the dead entry must have been removed.
 

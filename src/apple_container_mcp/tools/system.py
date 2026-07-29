@@ -1,10 +1,21 @@
 """System management tools and the system-status MCP resource."""
 
 import json
+import re
 from typing import Dict, Any
 
 from . import mcp, _DESTRUCTIVE, _run_container_cmd, ContainerCLIError
-from ..cli_wrapper import _detect_cli_major_version, version_warning, MINIMUM_CLI_MAJOR_VERSION
+from ..cli_wrapper import (
+    _detect_cli_version,
+    version_warning,
+    MINIMUM_CLI_MAJOR_VERSION,
+    RECOMMENDED_CLI_VERSION,
+)
+
+# Accepted `container system logs --last` window: a number with an optional
+# m/h/d suffix (bare numbers are seconds). Anything else is rejected rather than
+# forwarded, so an LLM cannot smuggle extra tokens into the argument list.
+_LOG_WINDOW_RE = re.compile(r"^\d+[mhd]?$")
 
 
 # --- Resources ---
@@ -129,27 +140,94 @@ def system_property_list() -> Dict[str, Any]:
 
 
 @mcp.tool()
+def system_df() -> Dict[str, Any]:
+    """
+    Report disk usage for images, containers, and volumes.
+
+    Use this before pruning to see how much space each category is holding and how
+    much of it is reclaimable. Requires the container system service to be running.
+
+    Returns:
+        On success: {"status": "ok", "disk_usage": {...}}
+            The payload has "containers", "images", and "volumes" keys, each with
+            active / total counts and sizeInBytes / reclaimable byte counts.
+        On error:   {"status": "error", "message": str, "details": str}
+    """
+    try:
+        result = _run_container_cmd(["system", "df"])
+        return {"status": "ok", "disk_usage": result}
+    except ContainerCLIError as e:
+        return {"status": "error", "message": "Failed to retrieve disk usage", "details": e.stderr}
+
+
+@mcp.tool()
+def system_logs(last: str = "5m") -> Dict[str, Any]:
+    """
+    Fetch recent log output from the `container` system services (the apiserver and
+    its helpers), as opposed to a single container's logs.
+
+    Reach for this when the daemon itself is misbehaving: containers that will not
+    start, a system service that fails to come up, or errors that never surface in
+    per-container logs. For one container's stdout/stderr, use `get_logs` instead.
+
+    This tool never passes `--follow`; streaming would block until the subprocess
+    timeout killed it. Widen the window instead.
+
+    Args:
+        last: How far back to read, as a number with an optional m/h/d suffix
+            (a bare number means seconds). Defaults to "5m".
+
+    Returns:
+        On success: {"status": "ok", "logs": str}
+        On error:   {"status": "error", "message": str, "details": str}
+    """
+    if not _LOG_WINDOW_RE.match(last):
+        return {
+            "status": "error",
+            "message": f"Invalid 'last' window: {last!r}. Use a number with an optional m, h, or d suffix (e.g. '5m').",
+        }
+    try:
+        result = _run_container_cmd(["system", "logs", "--last", last])
+        logs = result.get("raw_output", "") if isinstance(result, dict) else str(result)
+        return {"status": "ok", "logs": logs}
+    except ContainerCLIError as e:
+        return {"status": "error", "message": "Failed to retrieve system logs", "details": e.stderr}
+
+
+@mcp.tool()
 def check_environment() -> Dict[str, Any]:
     """
-    Probe the local Apple Container CLI: report whether it is installed and whether it
-    meets the minimum supported major version (1.0+). Use this as a first step when
-    diagnosing setup problems. Does not require the daemon to be running.
+    Probe the local Apple Container CLI: report whether it is installed, whether it
+    meets the minimum supported major version (1.0+), and whether an upgrade is
+    recommended. Use this as a first step when diagnosing setup problems. Does not
+    require the daemon to be running.
     """
-    major = _detect_cli_major_version()
-    if major is None:
+    version = _detect_cli_version()
+    if version is None:
         return {
             "status": "error",
             "message": "The Apple Container CLI ('container') was not found on PATH. "
             "Install Apple Container 1.0+ from https://github.com/apple/container.",
         }
+    major, minor = version
     if major < MINIMUM_CLI_MAJOR_VERSION:
         return {
             "status": "warning",
             "cli_major_version": major,
+            "cli_version": f"{major}.{minor}",
             "warning": version_warning(major),
         }
-    return {
+    result: Dict[str, Any] = {
         "status": "ok",
         "cli_major_version": major,
-        "message": f"Apple Container CLI {major}.x detected (meets the {MINIMUM_CLI_MAJOR_VERSION}.0+ minimum).",
+        "cli_version": f"{major}.{minor}",
+        "message": f"Apple Container CLI {major}.{minor} detected (meets the {MINIMUM_CLI_MAJOR_VERSION}.0+ minimum).",
     }
+    if version < RECOMMENDED_CLI_VERSION:
+        recommended = f"{RECOMMENDED_CLI_VERSION[0]}.{RECOMMENDED_CLI_VERSION[1]}"
+        result["recommendation"] = (
+            f"Apple Container {recommended} is recommended (you have {major}.{minor}). "
+            f"It adds XPC request validation, kernel archive integrity checks, and a fix for "
+            f"symlink following when copying user configuration. Upgrade with `brew upgrade container`."
+        )
+    return result

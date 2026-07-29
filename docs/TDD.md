@@ -4,12 +4,15 @@
 
 The solution is built as a Python-based MCP server using the FastMCP framework. It communicates with the host macOS system via the container binary using the subprocess module.
 
+The repository also builds a second console script, `d2c`, from the sibling `src/d2c` package. It shares the target CLI but imports nothing from `apple_container_mcp` and has its own execution wrapper; see section 3.D.
+
 ### **Components**
 
 1. **MCP Host (e.g., Claude Desktop):** The user interface.  
 2. **MCP Server:** The Python process orchestrating tools and logic.  
 3. **Apple Container CLI:** The container binary (installed via Apple’s open-source project).  
 4. **XPC Interface:** The underlying communication channel between the CLI and the container-apiserver daemon.
+5. **`d2c` CLI:** A standalone terminal entry point that translates Docker commands into Apple Container commands. Invoked directly by the user, not by the MCP host.
 
 ## **2\. Technical Stack**
 
@@ -103,7 +106,9 @@ def _run_container_cmd(args: List[str], timeout: Optional[int] = None) -> Any:
 | system_version | container system version | Returns CLI/apiserver versions as JSON. Works without the daemon. (Apple Container 0.12+) |
 | stats_container | container stats --no-stream [containers...] | One-shot resource-usage snapshot. Always non-streaming. (Apple Container 0.12+) |
 | system_property_list | container system property list | List system property values (TOML config). Replaces removed `system property get`/`set`. (Apple Container 1.0+) |
-| check_environment | N/A (probes `container --version`) | Report whether the CLI is installed and meets the 1.0+ minimum. Works without the daemon. |
+| system_df | container system df | Disk usage for images, containers, and volumes, with reclaimable byte counts. JSON-formatted. |
+| system_logs | container system logs --last [window] | Logs from the `container` system services, not from one container. Never passes `--follow`; `last` is validated against `^\d+[mhd]?$`. |
+| check_environment | N/A (probes `container --version`) | Report whether the CLI is installed, meets the 1.0+ minimum, and whether an upgrade to the recommended 1.2 is suggested. Works without the daemon. |
 | copy_to_container | container cp [source] [id]:[dest] | Copy host→container. Host `source` restricted to home directory. |
 | copy_from_container | container cp [id]:[source] [dest] | Copy container→host. Host `dest` restricted to home directory. |
 | create_machine | container machine create [image] | Create/boot a persistent Linux machine. Maps cpus, memory, home-mount; `virtualization` maps to `--virtualization` (Apple Container 1.1+, version-gated). (Apple Container 1.0+) |
@@ -124,6 +129,30 @@ The server implements several `mcp.prompt` handlers to guide users through compl
 - `cleanup_environment`: Guided cleanup of unused resources.
 - `setup_private_registry`: Authentication and image movement for private registries.
 
+### **D. The `d2c` Translator**
+
+`src/d2c` is deliberately separate from the MCP server: no shared imports, no FastMCP dependency, and its own subprocess call. The MCP server's wrapper captures and parses output for an LLM; `d2c` streams straight to the terminal because a human is reading it. Merging them would force one of the two to compromise.
+
+The package is four small modules, each holding one concern:
+
+| Module | Responsibility |
+| :---- | :---- |
+| `registry.py` | `COMMANDS`, a `dict[str, CommandTranslation]` mapping a Docker command to its `container` argument list plus an optional explanatory note. `translate()` strips the management namespace (`docker container run` → look up `run`) and appends the remaining args verbatim. |
+| `unsupported.py` | `UNSUPPORTED`, a `dict[str, UnsupportedCommand]` of commands with no Apple Container counterpart, each carrying a hint naming the alternative. |
+| `global_flags.py` | `strip_global_flags()` separates Docker global flags from command args; `GLOBAL_FLAGS` are warned about and `TRANSLATABLE_GLOBAL_FLAGS` are rewritten. |
+| `executor.py` | `dry_run()` prints the translation; `execute()` runs it and returns the child's exit code. |
+
+`cli.py` sequences these: extract `--dry-run`, strip global flags and prompt on the unsupported ones, check `UNSUPPORTED` before `COMMANDS` so a dropped command gets its hint rather than an "unknown command" error, translate, splice in any translated global flags after the `container` token, then either print or execute.
+
+Design decisions worth preserving:
+
+* **Unsupported is checked before translate.** Reversing the order would turn a `docker compose` invocation into a bare `unknown command` message and lose the hint that makes the tool useful.
+* **`strip_global_flags` stops at the first positional argument.** Docker global flags are only valid before the subcommand, and short flags like `-c` and `-l` are common inside subcommand args. Scanning the whole list would corrupt `d2c exec mycontainer bash -c "echo hi"`.
+* **`prompt_continue` returns `False` on `EOFError` and `KeyboardInterrupt`, and defaults to no.** A script with closed stdin must halt rather than proceed against settings the user did not intend.
+* **Exit code passthrough.** `execute()` returns the child's return code and `cli.py` calls `sys.exit()` with it, so `d2c` is transparent to shell conditionals and CI.
+* **`CommandTranslation.flag_map` is currently unused.** It exists for future flag renames. Today flags pass through unchanged, which means a Docker flag with no Apple Container counterpart is rejected by the `container` binary, not by `d2c`. That is an accepted limitation, not an oversight.
+* **Mappings are verified against the installed binary.** `rmi` originally pointed at `container image remove`, which does not exist — the CLI spells it `image delete` (alias `rm`) — and the unit test asserted the broken string, so it never failed. Fixed in 0.5.0. When adding or changing a mapping, run the target subcommand's `--help` rather than trusting the Docker name.
+
 ## **4\. Error Handling & Edge Cases**
 
 1. **Daemon Not Running:** If a command fails with "connection refused" or "cannot connect," `_run_container_cmd` normalises the error into a well-known `ContainerCLIError` message. `check_apiserver_status` catches this directly and returns `{"status": "stopped"}`.  
@@ -140,16 +169,17 @@ The server implements several `mcp.prompt` handlers to guide users through compl
 
 * **Local Execution:** The MCP server only accepts requests from the local MCP Host.  
 * **Path Validation:** `build_image` validates that `context_path` is within the user's home directory using `os.path.realpath` with a trailing `os.sep` check to prevent prefix-match bypasses (e.g. `/Users/joe` vs `/Users/joey`). The same guard (extracted into a shared `_validate_home_path` helper) is applied to `env_file` in `run_container` and to the HOST path of the cp tools: `copy_to_container`'s `source` and `copy_from_container`'s `dest` are both restricted to the home directory.  
-* **Argument Sanitization:** `subprocess.run` is called with a list of arguments (never `shell=True`) to prevent shell injection. `run_container`'s `args_override` parameter is validated against a blocklist of dangerous flags to prevent privilege escalation, capability grants, and credential exposure via LLM prompt injection. The current blocklist: `--privileged`, `--cap-add`, `--cap-drop`, `--security-opt`, `--device`, `--pid`, `--ipc`, `--userns`, `--cgroupns`, `--no-new-privileges`, `--kernel` / `-k`, `--ssh`.
+* **Argument Sanitization:** `subprocess.run` is called with a list of arguments (never `shell=True`) to prevent shell injection. `run_container`'s `args_override` parameter is validated against a blocklist of dangerous flags to prevent privilege escalation, capability grants, and credential exposure via LLM prompt injection. The current blocklist: `--privileged`, `--cap-add`, `--cap-drop`, `--security-opt`, `--device`, `--pid`, `--ipc`, `--userns`, `--cgroupns`, `--no-new-privileges`, `--kernel` / `-k`, `--kernel-arg`, `--ssh`. Note that the blocklist is defense in depth: `args_override` is appended after the image name, and the CLI parses post-image tokens as container init-process arguments rather than `run` options, so a leaked flag reaches the guest as a command argument. That positional behaviour is an undocumented implementation detail, so the blocklist stays.
 * **Capabilities and 0.12 audit additions:** Apple Container 0.12 promoted `--cap-add` / `--cap-drop` to documented public flags. This MCP deliberately keeps them in the blocklist and does NOT expose them as tool parameters. The 0.12 CLI audit also surfaced `--kernel` / `-k` (arbitrary host kernel-image path injection) and `--ssh` (host SSH-agent socket forwarding); both have been added to the blocklist for the same reasons.  
 * **1.1 audit — machine kernel override:** Apple Container 1.1 added `machine create --kernel <path>` and `machine set kernel=<path>`, which load an arbitrary host filesystem path as guest kernel code — the same privilege-escalation vector as run's `--kernel`. The machine tools build CLI arguments from typed parameters only, so no blocklist entry is needed; the kernel override is deliberately NOT exposed as a tool parameter. Nested virtualization (`--virtualization` / `virtualization=<bool>`) IS exposed: it grants the guest VM capabilities but no access to host resources. The 1.1 CLI audit found no other new flags (the 1.0 → 1.1 command-reference delta is limited to these machine options).  
+* **1.2 audit — kernel boot arguments:** Apple Container 1.2 added `--kernel-arg <arg>` to `run` and `create`, which appends raw arguments to the guest kernel command line. A value such as `init=/bin/sh` replaces the guest init before any container process runs, so this is the same class as `--kernel` and is blocklisted and unexposed. The 1.1 → 1.2 delta contains no other new CLI flags; the rest of the release is Swift API work (OCI `maskedPaths` / `readonlyPaths`), upstream security fixes, and test infrastructure. The existing `--format json` allowlist was re-verified against the 1.2.0 binary and `("system", "df")` was added.
 * **Credential Handling:** `registry_login` passes the password via `stdin` to avoid exposing it in process arguments.
 
 ## **6\. Deployment Plan**
 
-1. **Pre-requisites:** Python 3.11+, `uv` (`brew install uv`), and the Apple `container` CLI 1.0+ (`brew install container`; Apple Silicon and macOS 26 recommended).  
-2. **Installation:** Run directly via `uvx` (no clone required) or install from a local clone using `uv sync --dev`.  
-3. **Configuration:** Add the MCP server to your client's configuration. Example for Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+1. **Pre-requisites:** Python 3.11+, `uv` (`brew install uv`), and the Apple `container` CLI 1.0+ (`brew install container`; 1.2+ recommended, Apple Silicon and macOS 26 recommended).  
+2. **Installation:** Run directly via `uvx` (no clone required) or install from a local clone using `uv sync --dev`. The wheel exposes two console scripts: `apple-container-mcp` (the MCP server) and `d2c` (the Docker translator). Both are declared under `[project.scripts]` and both package directories are listed in `[tool.hatch.build.targets.wheel]`; adding a third package means updating that list too.
+3. **Configuration:** `d2c` needs no configuration — it is invoked directly (`uvx --from git+… d2c ps -a`, or `d2c` from a synced clone). The MCP server must be added to your client's configuration. Example for Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.json`):
 
 ```json
 {
@@ -174,3 +204,4 @@ See the README for configuration snippets for Cursor, Gemini CLI, VSCode/Cline, 
 
 * **Streamed Logs:** Support for MCP resources to provide real-time log updates.  
 * **Virtualization Framework Integration:** Direct inspection of the Virtualization.framework state if the CLI is insufficient.
+* **`d2c` flag translation:** `CommandTranslation.flag_map` is wired up but empty. Populating it would let `d2c` rewrite or reject Docker flags that Apple Container spells differently, instead of deferring the failure to the `container` binary.

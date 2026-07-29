@@ -217,7 +217,7 @@ def test_system_property_list_error(mocker):
 def test_check_environment_ok_when_version_current(mocker):
     from apple_container_mcp.tools import system
 
-    mocker.patch.object(system, "_detect_cli_major_version", return_value=1)
+    mocker.patch.object(system, "_detect_cli_version", return_value=(1, 2))
 
     result = system.check_environment()
 
@@ -229,7 +229,7 @@ def test_check_environment_ok_when_version_current(mocker):
 def test_check_environment_warns_on_old_version(mocker):
     from apple_container_mcp.tools import system
 
-    mocker.patch.object(system, "_detect_cli_major_version", return_value=0)
+    mocker.patch.object(system, "_detect_cli_version", return_value=(0, 12))
 
     result = system.check_environment()
 
@@ -240,12 +240,114 @@ def test_check_environment_warns_on_old_version(mocker):
 def test_check_environment_errors_when_cli_missing(mocker):
     from apple_container_mcp.tools import system
 
-    mocker.patch.object(system, "_detect_cli_major_version", return_value=None)
+    mocker.patch.object(system, "_detect_cli_version", return_value=None)
 
     result = system.check_environment()
 
     assert result["status"] == "error"
     assert "not found" in result["message"].lower()
+
+
+def test_check_environment_recommends_upgrade_on_older_minor(mocker):
+    from apple_container_mcp.tools import system
+
+    mocker.patch.object(system, "_detect_cli_version", return_value=(1, 0))
+
+    result = system.check_environment()
+
+    assert result["status"] == "ok"
+    assert result["cli_version"] == "1.0"
+    assert "1.2" in result["recommendation"]
+
+
+def test_check_environment_no_recommendation_on_current_minor(mocker):
+    from apple_container_mcp.tools import system
+
+    mocker.patch.object(system, "_detect_cli_version", return_value=(1, 2))
+
+    result = system.check_environment()
+
+    assert result["status"] == "ok"
+    assert result["cli_version"] == "1.2"
+    assert result.get("recommendation") is None
+
+
+def test_system_df_ok(mocker):
+    from apple_container_mcp.tools import system
+
+    payload = {"containers": {"total": 8, "reclaimable": 36928598016}}
+    mock = mocker.patch.object(system, "_run_container_cmd", return_value=payload)
+
+    result = system.system_df()
+
+    assert result["status"] == "ok"
+    assert result["disk_usage"] == payload
+    mock.assert_called_once_with(["system", "df"])
+
+
+def test_system_df_error(mocker):
+    from apple_container_mcp.tools import system
+
+    mocker.patch.object(system, "_run_container_cmd", side_effect=ContainerCLIError("boom", 1, "daemon down"))
+
+    result = system.system_df()
+    assert result["status"] == "error"
+
+
+def test_system_logs_defaults_to_last_5m(mocker):
+    from apple_container_mcp.tools import system
+
+    mock = mocker.patch.object(system, "_run_container_cmd", return_value={"raw_output": "line one"})
+
+    result = system.system_logs()
+
+    assert result["status"] == "ok"
+    assert result["logs"] == "line one"
+    mock.assert_called_once_with(["system", "logs", "--last", "5m"])
+
+
+def test_system_logs_accepts_custom_window(mocker):
+    from apple_container_mcp.tools import system
+
+    mock = mocker.patch.object(system, "_run_container_cmd", return_value={"raw_output": ""})
+
+    system.system_logs(last="2h")
+
+    mock.assert_called_once_with(["system", "logs", "--last", "2h"])
+
+
+def test_system_logs_rejects_malformed_window(mocker):
+    from apple_container_mcp.tools import system
+
+    mock = mocker.patch.object(system, "_run_container_cmd")
+
+    result = system.system_logs(last="; rm -rf /")
+
+    assert result["status"] == "error"
+    assert "last" in result["message"]
+    mock.assert_not_called()
+
+
+def test_system_logs_never_follows(mocker):
+    """--follow would block the subprocess until the timeout kills it."""
+    from apple_container_mcp.tools import system
+
+    mock = mocker.patch.object(system, "_run_container_cmd", return_value={"raw_output": ""})
+
+    system.system_logs(last="10m")
+
+    called_args = mock.call_args[0][0]
+    assert "-f" not in called_args
+    assert "--follow" not in called_args
+
+
+def test_system_logs_error(mocker):
+    from apple_container_mcp.tools import system
+
+    mocker.patch.object(system, "_run_container_cmd", side_effect=ContainerCLIError("boom", 1, "no logs"))
+
+    result = system.system_logs()
+    assert result["status"] == "error"
 
 
 def test_system_version_includes_warning_on_old_major(mocker):
@@ -1207,6 +1309,13 @@ def test_run_container_args_override_blocked_kernel_short(mocker):
     result = run_container("debian", args_override=["-k", "/path/to/kernel"])
     assert result["status"] == "error"
     assert "-k" in result["message"]
+
+
+def test_run_container_args_override_blocked_kernel_arg(mocker):
+    """--kernel-arg (Apple Container 1.2+) appends raw guest boot arguments; same class as --kernel."""
+    result = run_container("debian", args_override=["--kernel-arg", "init=/bin/sh"])
+    assert result["status"] == "error"
+    assert "--kernel-arg" in result["message"]
 
 
 def test_run_container_args_override_blocked_ssh(mocker):

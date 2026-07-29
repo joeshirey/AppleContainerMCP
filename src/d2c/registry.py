@@ -28,8 +28,8 @@ COMMANDS: dict[str, CommandTranslation] = {
     "pull": CommandTranslation(container_cmd=["container", "image", "pull"]),
     "push": CommandTranslation(container_cmd=["container", "image", "push"]),
     "rmi": CommandTranslation(
-        container_cmd=["container", "image", "remove"],
-        note="'rmi' maps to Apple Container's 'image remove' subcommand",
+        container_cmd=["container", "image", "delete"],
+        note="'rmi' maps to Apple Container's 'image delete' subcommand",
     ),
     "tag": CommandTranslation(container_cmd=["container", "image", "tag"]),
     "build": CommandTranslation(container_cmd=["container", "build"]),

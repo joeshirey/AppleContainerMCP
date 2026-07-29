@@ -37,6 +37,13 @@ LONG_RUNNING_COMMANDS = {"pull", "push", "start", "build"}
 # XPC v0 compatibility, so older CLIs cannot interoperate with a 1.0 install.
 MINIMUM_CLI_MAJOR_VERSION = 1
 
+# Recommended (not required) Apple Container CLI version as a (major, minor) tuple.
+# 1.2 shipped upstream security fixes worth having: XPC container-ID validation,
+# no symlink-following when copying user configuration, kernel archive integrity
+# checks, and removal of force unwraps in XPC error handling. Older 1.x releases
+# still work, so this drives an advisory rather than the hard version gate.
+RECOMMENDED_CLI_VERSION = (1, 2)
+
 
 @functools.lru_cache(maxsize=1)
 def _detect_cli_version() -> Optional[tuple[int, int]]:
@@ -124,6 +131,9 @@ def _run_container_cmd(args: List[str], timeout: Optional[int] = None) -> Any:
         ("stats",),  # container stats (verified in 0.12)
         ("machine", "ls"),  # container machine ls (1.0) — json|table only
         ("system", "property", "list"),  # container system property list (1.0) — json|toml
+        ("system", "df"),  # container system df — json|table|yaml|toml (verified in the 1.2 audit)
+        # `container system logs` is deliberately absent: it emits plain text and
+        # has no --format flag. Do not add it.
     }
     leading = tuple(args)
     # Check if the start of the current command matches any entry in our JSON-capable allowlist.

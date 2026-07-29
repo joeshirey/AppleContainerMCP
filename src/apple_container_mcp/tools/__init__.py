@@ -43,6 +43,12 @@ mcp = FastMCP("apple-container-mcp")
 #   kernel. The daemon loads that path as kernel code; an attacker-controlled
 #   path is a privilege-escalation vector. Both spellings are blocked.
 #
+# --kernel-arg (Apple Container 1.2+):
+#   Appends raw arguments to the guest kernel command line. Boot args such as
+#   `init=/bin/sh` or flags that disable guest hardening subvert the VM before
+#   any container process starts, so this belongs to the same class as --kernel
+#   and is likewise neither exposed nor accepted via args_override.
+#
 # --ssh (Apple Container 0.12 audit finding):
 #   Forwards the host's SSH agent socket into the container. Any process
 #   inside the container can use the user's SSH credentials silently. This
@@ -71,6 +77,7 @@ _DANGEROUS_FLAGS: frozenset[str] = frozenset(
         "--no-new-privileges",
         "--kernel",
         "-k",
+        "--kernel-arg",
         "--ssh",
     }
 )
@@ -137,6 +144,8 @@ from .system import (  # noqa: E402, F401
     system_status,
     system_version,
     system_property_list,
+    system_df,
+    system_logs,
     check_environment,
 )
 from .containers import (  # noqa: E402, F401
