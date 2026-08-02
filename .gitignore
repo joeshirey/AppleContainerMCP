@@ -212,3 +212,6 @@ marimo/_lsp/
 __marimo__/
 .local/
 
+.claude/
+.gemini/
+.docs/superpowers/
