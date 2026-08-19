@@ -478,6 +478,55 @@ def test_run_container_invalid_volume(mocker):
     assert "HOST:CONTAINER" in result["message"]
 
 
+def test_run_container_with_read_only_paths(mocker):
+    mock = _mock_cmd(mocker)
+    mock.return_value = {"raw_output": "abc"}
+    result = run_container("debian", read_only_paths=["/etc/secret", "/var/lib/data"])
+    assert result["status"] == "ok"
+    called_args = mock.call_args[0][0]
+    assert called_args.count("--read-only-path") == 2
+    assert "/etc/secret" in called_args
+    assert "/var/lib/data" in called_args
+
+
+def test_run_container_with_masked_paths(mocker):
+    mock = _mock_cmd(mocker)
+    mock.return_value = {"raw_output": "abc"}
+    result = run_container("debian", masked_paths=["/proc/kcore"])
+    assert result["status"] == "ok"
+    called_args = mock.call_args[0][0]
+    assert "--masked-path" in called_args
+    assert "/proc/kcore" in called_args
+
+
+def test_run_container_read_only_path_none_rejected(mocker):
+    result = run_container("debian", read_only_paths=["NONE"])
+    assert result["status"] == "error"
+    assert "NONE" in result["message"]
+
+
+def test_run_container_masked_path_none_rejected_case_insensitive(mocker):
+    result = run_container("debian", masked_paths=["none"])
+    assert result["status"] == "error"
+    assert "NONE" in result["message"]
+
+
+def test_run_container_masked_path_none_rejected_with_padding(mocker):
+    result = run_container("debian", masked_paths=[" NoNe "])
+    assert result["status"] == "error"
+    assert "NONE" in result["message"]
+
+
+def test_run_container_read_only_path_allows_none_as_substring(mocker):
+    """A path that merely contains 'none' (not equal to it) must not be rejected."""
+    mock = _mock_cmd(mocker)
+    mock.return_value = {"raw_output": "abc"}
+    result = run_container("debian", read_only_paths=["/var/none-such"])
+    assert result["status"] == "ok"
+    called_args = mock.call_args[0][0]
+    assert "/var/none-such" in called_args
+
+
 def test_list_containers_with_results(mocker):
     mock = _mock_cmd(mocker)
     mock.return_value = [{"id": "abc", "name": "web"}]
@@ -1457,6 +1506,28 @@ def test_build_thread_records_failure(mocker):
     with _builds_lock:
         assert active_builds[build_id]["state"] == "failed"
         assert "Dockerfile not found" in active_builds[build_id]["error"]
+
+
+def test_build_thread_passes_ssh(mocker):
+    """_run_build_thread should append --ssh <value> when ssh is provided."""
+    import threading
+    from apple_container_mcp.tools import _run_build_thread, active_builds, _builds_lock
+    import time
+
+    build_id = "test_build_ssh"
+    with _builds_lock:
+        active_builds[build_id] = {"state": "in_progress", "updated_at": time.monotonic()}
+
+    mock = _mock_cmd(mocker)
+    mock.return_value = {"raw_output": "sha256:abc"}
+
+    thread = threading.Thread(target=_run_build_thread, args=(build_id, "/some/path"), kwargs={"ssh": "default"})
+    thread.start()
+    thread.join(timeout=5)
+
+    called_args = mock.call_args[0][0]
+    assert "--ssh" in called_args
+    assert "default" in called_args
 
 
 # ---------------------------------------------------------------------------

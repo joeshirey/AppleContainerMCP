@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] - 2026-08-18
+
+### Added
+
+- Apple Container 1.2.1/1.2.2 support, validated against the installed 1.2.2
+  binary. The minimum supported CLI version remains 1.0.0; the recommended
+  1.2 line still covers 1.2.1/1.2.2.
+- `run_container` gains `read_only_paths` and `masked_paths` (1.2.1+,
+  EXPERIMENTAL upstream), wrapping the repeatable `--read-only-path` /
+  `--masked-path` flags. These only *add* to the runtime's default
+  read-only/masked path lists — a literal `"NONE"` (case-insensitive), which
+  upstream uses to clear the defaults instead, is rejected.
+- `build_image` gains `ssh` (1.2.1+), wrapping `--ssh <value>` (e.g.
+  `"default"`) to forward the host's SSH agent to a `RUN --mount=type=ssh`
+  step during the build. Scoped to the build process only — unrelated to (and
+  no more exposed than) `run`'s own `--ssh`, which stays blocked.
+- `export_container`'s docstring now notes it works against running
+  containers as well as stopped ones (1.2.1+); no code change was needed
+  since the tool already just forwards to the CLI.
+
+### Notes
+
+- Apple Container 1.2.1 also shipped a `container k8s` plugin for local
+  Kubernetes clusters. It's marked EXPERIMENTAL upstream and isn't bundled
+  with the Homebrew install, so it isn't wrapped by this server yet.
+
 ## [0.5.0] - 2026-07-29
 
 ### Added

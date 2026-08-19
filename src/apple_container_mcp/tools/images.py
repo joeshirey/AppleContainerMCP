@@ -57,6 +57,7 @@ def _run_build_thread(
     no_cache: bool = False,
     platform: Optional[str] = None,
     target: Optional[str] = None,
+    ssh: Optional[str] = None,
 ) -> None:
     """
     Internal worker function executed in a background thread to run container builds.
@@ -73,6 +74,8 @@ def _run_build_thread(
         args.extend(["--platform", platform])
     if target:
         args.extend(["--target", target])
+    if ssh:
+        args.extend(["--ssh", ssh])
     if secrets:
         for secret in secrets:
             args.extend(["--secret", secret])
@@ -111,6 +114,7 @@ def build_image(
     no_cache: bool = False,
     platform: Optional[str] = None,
     target: Optional[str] = None,
+    ssh: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Build an image from a local context path (runs asynchronously — builds can be long).
@@ -125,6 +129,10 @@ def build_image(
       no_cache: Disable layer cache.
       platform: Target platform, e.g. "linux/amd64".
       target: Multi-stage build target stage name.
+      ssh: Forward the host's SSH agent to the build (Apple Container 1.2.1+), e.g. "default".
+        Only reachable during a Dockerfile `RUN --mount=type=ssh` step, not for the container's
+        whole lifetime — unrelated to (and no more exposed than) `run_container`'s SSH handling,
+        which stays blocked.
     """
     context_path = os.path.expanduser(context_path)
     if not os.path.exists(context_path):
@@ -145,7 +153,7 @@ def build_image(
     # Start build in daemon thread so it doesn't block the MCP server from shutting down.
     thread = threading.Thread(
         target=_run_build_thread,
-        args=(build_id, context_path, tag, secrets, dockerfile, build_args, no_cache, platform, target),
+        args=(build_id, context_path, tag, secrets, dockerfile, build_args, no_cache, platform, target, ssh),
     )
     thread.daemon = True
     thread.start()

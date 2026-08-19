@@ -36,16 +36,25 @@ def run_container(
     workdir: Optional[str] = None,
     user: Optional[str] = None,
     labels: Optional[List[str]] = None,
+    read_only_paths: Optional[List[str]] = None,
+    masked_paths: Optional[List[str]] = None,
     args_override: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """
     Start a container from an image with optional resource constraints, networking, ports, env vars,
     volume mounts, and more. Pass a command to run via args_override.
     Use shm_size to set the size of /dev/shm (e.g. "1G").
+
+    read_only_paths and masked_paths (Apple Container 1.2.1+, EXPERIMENTAL upstream) add extra
+    in-guest paths to the runtime's default read-only/masked lists — they only tighten isolation.
+    The upstream CLI also accepts a "NONE" sentinel there to clear the defaults and widen the
+    container's attack surface; this tool rejects that value and only supports the additive form.
+
     Examples:
       run_container("debian", memory="4g", cpus=2, ports=["8080:8080"])
       run_container("ubuntu", rm=True, detach=False, args_override=["bash", "-c", "echo hi"])
       run_container("my-app", rosetta=True, platform="linux/amd64")
+      run_container("myapp", masked_paths=["/proc/kcore"], read_only_paths=["/etc"])
     """
     # Lightweight input validation
     if ports:
@@ -62,6 +71,20 @@ def run_container(
         for v in volumes:
             if ":" not in v:
                 return {"status": "error", "message": f"Invalid volume format: {v}. Expected 'HOST:CONTAINER'."}
+
+    # The CLI treats "NONE" as a sentinel that clears the runtime's default
+    # read-only/masked paths instead of adding to them, which weakens the
+    # guest's isolation. Reject it so this tool only exposes the additive,
+    # isolation-tightening use of these flags.
+    for label, paths in (("read_only_paths", read_only_paths), ("masked_paths", masked_paths)):
+        if paths:
+            for p in paths:
+                if p.strip().upper() == "NONE":
+                    return {
+                        "status": "error",
+                        "message": f"Invalid {label} entry: {p!r}. 'NONE' clears the runtime's default "
+                        "protected paths instead of adding to them. Pass explicit paths to add instead.",
+                    }
 
     # Restrict env_file to paths within the user's home directory to prevent
     # an LLM (or prompt injection) from reading arbitrary system files.
@@ -113,6 +136,12 @@ def run_container(
     if labels:
         for label in labels:
             cmd_args.extend(["--label", label])
+    if read_only_paths:
+        for p in read_only_paths:
+            cmd_args.extend(["--read-only-path", p])
+    if masked_paths:
+        for p in masked_paths:
+            cmd_args.extend(["--masked-path", p])
     if init_image:
         cmd_args.extend(["--init-image", init_image])
 
@@ -191,7 +220,10 @@ def remove_container(container_id: str, force: bool = False) -> Dict[str, Any]:
 
 @mcp.tool()
 def export_container(container_id: str, output_file: Optional[str] = None) -> Dict[str, Any]:
-    """Export a container's filesystem as a tar archive (OCI layout). Requires an output_file path."""
+    """
+    Export a container's filesystem as a tar archive (OCI layout). Requires an output_file path.
+    Works on running containers as well as stopped ones (Apple Container 1.2.1+).
+    """
     if not output_file:
         return {"status": "error", "message": "output_file is required to save the tar archive."}
 
