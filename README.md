@@ -17,7 +17,7 @@ The package installs two commands. `apple-container-mcp` is the MCP server descr
    brew install uv
    ```
 
-3. **Apple Container CLI**: Provided by Apple's virtualization framework. **Requires container CLI 1.0+; validated against 1.2.2, which is the recommended version** (Apple Silicon and macOS 26 recommended). 1.2.0 ships upstream security fixes — XPC request validation, kernel archive integrity checks, and no symlink following when copying user configuration — so `check_environment` will suggest upgrading if you are on an older 1.x. 1.2.1 added `run_container`'s `read_only_paths`/`masked_paths` and `build_image`'s `ssh` parameter (see [Security Model](#-security-model)); a local Kubernetes plugin (`container k8s`) also shipped in 1.2.1 but isn't wrapped by this server yet. Install via Homebrew, then start the system service:
+3. **Apple Container CLI**: **Requires container CLI 1.0+; 1.4.1 is recommended and locally tested.** Use Apple Silicon with macOS 26 or newer. Version 1.4.1 includes upstream image-loading and Unix socket security fixes. `check_environment` reports the full patch version and recommends upgrading older installations. New tools have their own version requirements; `clean_container` requires 1.4.1+. Install via Homebrew, then start the system service:
 
    ```bash
    brew install container
@@ -253,6 +253,59 @@ Open your Gemini CLI settings file (typically `~/.gemini/settings.json`) and add
 
 ---
 
+## Local testing
+
+Run the working checkout with the default MCP stdio transport:
+
+```bash
+uv run apple-container-mcp
+```
+
+For an MCP client that supports Streamable HTTP:
+
+```bash
+uv run apple-container-mcp --transport streamable-http --port 8765
+```
+
+Connect the client to `http://127.0.0.1:8765/mcp`. The server binds to loopback only;
+this URL is an MCP endpoint, not a browser UI. Start with `check_environment`,
+`system_status`, and `list_containers`. Stdio remains the default for existing
+client configurations.
+
+For repeatable live validation, with the container service already running:
+
+```bash
+uv run python scripts/smoke_test.py
+```
+
+Use `--registry` to include HTTP push/pull through a temporary local registry;
+this requires working host-to-container networking.
+
+The smoke test creates uniquely named containers, images, a network, and volumes,
+then removes those test resources. It pulls Alpine (and Registry when `--registry` is selected) and starts the
+builder, leaving those shared runtime dependencies available afterward. It
+never prunes resources or stops the system service.
+
+### Registry transport and system status on 1.4.1
+
+`pull_image`, `push_image`, `run_container`, `create_machine`, and `registry_login` accept optional
+`scheme="http"` or `scheme="https"`. Omission uses the installed CLI's default:
+HTTPS on 1.3+. For a deliberately configured local HTTP registry, pass
+`scheme="http"` explicitly to each operation. HTTPS failures never trigger an
+automatic HTTP retry. The `setup_private_registry` prompt accepts the same option.
+
+`system_status` preserves the existing outer response and returns the richer
+upstream payload under `system_status`, including client/server, host, paths,
+and optional resource counts. Missing counts are not synthesized. On stopped
+services it returns `status="error"` with the upstream status payload;
+`check_apiserver_status` returns `status="stopped"` for both `unregistered` and
+`not running`. `check_environment.cli_version` now includes the patch number.
+
+`clean_container(container_id)` reclaims unused filesystem space in an already
+running container. It does not remove containers or replace prune operations.
+
+---
+
 ## 💬 10 Natural Language Prompt Examples
 
 Once the MCP server is configured in your LLM client, you can use natural language to manage your Mac containers instead of typing commands manually. Try prompts like these:
@@ -275,7 +328,7 @@ Once the MCP server is configured in your LLM client, you can use natural langua
 ### Tools Exposed
 
 - **System**: `check_apiserver_status`, `start_system`, `stop_system`, `system_status`, `system_version`, `system_property_list`, `system_df`, `system_logs`, `check_environment`
-- **Containers**: `run_container` (supports `--init-image`, rosetta, platform, labels, `shm_size`, and more), `list_containers`, `start_container`, `stop_container`, `remove_container`, `export_container`, `inspect_container`, `exec_in_container`, `get_logs`, `prune_containers`, `stats_container`
+- **Containers**: `run_container` (supports `--init-image`, rosetta, platform, labels, `shm_size`, and more), `list_containers`, `start_container`, `stop_container`, `remove_container`, `export_container`, `inspect_container`, `exec_in_container`, `get_logs`, `prune_containers`, `stats_container`, `clean_container` (1.4.1+, reclaims filesystem space in a running container and its named volumes)
 - **Files**: `copy_to_container`, `copy_from_container`
 - **Machines**: `create_machine` (supports nested virtualization on container 1.1+), `run_machine`, `list_machines`, `inspect_machine`, `set_machine`, `set_default_machine`, `machine_logs`, `stop_machine`, `delete_machine`
 - **Images**: `list_images`, `pull_image`, `build_image`, `check_build_status`, `list_builds`, `tag_image`, `push_image`, `inspect_image`, `remove_image`, `prune_images`
@@ -337,6 +390,8 @@ Without `--dry-run`, `d2c` executes the translated command and exits with that c
 Thirty Docker commands map onto Apple Container equivalents, covering container lifecycle (`ps`, `run`, `exec`, `stop`, `start`, `kill`, `rm`, `logs`, `inspect`, `cp`, `create`, `export`, `stats`), images (`images`, `pull`, `push`, `rmi`, `tag`, `build`, `load`, `save`), registry auth (`login`, `logout`), and the `network` / `volume` / `system` / `image` / `builder` management groups. Where a name differs enough to be surprising, the translation carries a note explaining the mapping.
 
 The Docker management namespace is stripped automatically, so `docker container run ubuntu` and `docker run ubuntu` both resolve to `container run ubuntu`.
+
+Apple Container 1.3+ defaults to HTTPS for registries. When targeting an explicitly configured HTTP registry, pass `--scheme http` to the translated operation.
 
 Flags after the command are passed through unchanged. `d2c` renames commands, not flags — a Docker flag with no Apple Container counterpart will be rejected by the `container` CLI rather than caught by `d2c`.
 

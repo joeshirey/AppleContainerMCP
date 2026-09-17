@@ -18,6 +18,15 @@ from ..cli_wrapper import (
 _LOG_WINDOW_RE = re.compile(r"^\d+[mhd]?$")
 
 
+def _status_error_payload(error: ContainerCLIError) -> Dict[str, Any]:
+    """Read status JSON emitted on stdout even when the CLI exits unsuccessfully."""
+    try:
+        payload = json.loads(error.stdout)
+    except (ValueError, TypeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
 # --- Resources ---
 
 
@@ -27,6 +36,11 @@ def get_system_status_resource() -> str:
     try:
         status = _run_container_cmd(["system", "status"])
         return json.dumps(status, indent=2)
+    except ContainerCLIError as e:
+        payload = _status_error_payload(e)
+        if payload:
+            return json.dumps(payload, indent=2)
+        return f"Error retrieving system status: {str(e)}"
     except Exception as e:
         return f"Error retrieving system status: {str(e)}"
 
@@ -42,12 +56,25 @@ def check_apiserver_status() -> Dict[str, Any]:
     Prefer `system_status` for richer output; this tool is kept for backwards compatibility.
     """
     try:
-        _run_container_cmd(["system", "status"])
+        result = _run_container_cmd(["system", "status"])
+        state = result.get("status", result.get("state")) if isinstance(result, dict) else None
+        if state in ("not running", "unregistered"):
+            return {"status": "stopped", "error": "The container-apiserver daemon is not reachable."}
+        if (
+            not isinstance(result, dict)
+            or "error" in result
+            or state not in (None, "running")
+            or (state is None and not result.get("version"))
+        ):
+            return {"status": "error", "message": "Unrecognized system status response", "details": result}
         return {"status": "ok", "message": "The container-apiserver daemon is running."}
     except ContainerCLIError as e:
         # _run_container_cmd normalises daemon-not-running errors into a well-known message string.
         # We search both the exception message and the raw stderr to catch daemon-not-reachable
         # errors regardless of how the caller constructed the ContainerCLIError.
+        payload = _status_error_payload(e)
+        if payload.get("status") in ("not running", "unregistered"):
+            return {"status": "stopped", "error": "The container-apiserver daemon is not reachable."}
         combined = (str(e) + " " + e.stderr).lower()
         daemon_indicators = ("daemon is not running", "daemon not running", "connection refused", "cannot connect")
         if any(indicator in combined for indicator in daemon_indicators):
@@ -82,14 +109,24 @@ def stop_system() -> Dict[str, Any]:
 @mcp.tool()
 def system_status() -> Dict[str, Any]:
     """
-    Retrieve system-wide status (version, driver status).
+    Retrieve service status, client/server versions, host, paths, and optional resource counts.
     Returns a dictionary containing 'status' and 'system_status'.
     """
     try:
         result = _run_container_cmd(["system", "status"])
+        if isinstance(result, dict) and "error" in result:
+            return {"status": "error", "message": "Invalid system status JSON", "system_status": result}
         return {"status": "ok", "system_status": result}
     except ContainerCLIError as e:
-        return {"status": "error", "message": "Failed to retrieve system status", "details": str(e)}
+        response: Dict[str, Any] = {
+            "status": "error",
+            "message": "Failed to retrieve system status",
+            "details": e.stderr or str(e),
+        }
+        payload = _status_error_payload(e)
+        if payload:
+            response["system_status"] = payload
+        return response
 
 
 @mcp.tool()
@@ -206,28 +243,30 @@ def check_environment() -> Dict[str, Any]:
     if version is None:
         return {
             "status": "error",
-            "message": "The Apple Container CLI ('container') was not found on PATH. "
+            "message": "The Apple Container CLI ('container') could not be detected "
+            "(missing binary, failed probe, or unrecognized version output). "
             "Install Apple Container 1.0+ from https://github.com/apple/container.",
         }
-    major, minor = version
+    major, minor, patch = version
+    version_text = f"{major}.{minor}.{patch}"
     if major < MINIMUM_CLI_MAJOR_VERSION:
         return {
             "status": "warning",
             "cli_major_version": major,
-            "cli_version": f"{major}.{minor}",
+            "cli_version": version_text,
             "warning": version_warning(major),
         }
     result: Dict[str, Any] = {
         "status": "ok",
         "cli_major_version": major,
-        "cli_version": f"{major}.{minor}",
-        "message": f"Apple Container CLI {major}.{minor} detected (meets the {MINIMUM_CLI_MAJOR_VERSION}.0+ minimum).",
+        "cli_version": version_text,
+        "message": f"Apple Container CLI {version_text} detected (meets the {MINIMUM_CLI_MAJOR_VERSION}.0+ minimum).",
     }
     if version < RECOMMENDED_CLI_VERSION:
-        recommended = f"{RECOMMENDED_CLI_VERSION[0]}.{RECOMMENDED_CLI_VERSION[1]}"
+        recommended = ".".join(map(str, RECOMMENDED_CLI_VERSION))
         result["recommendation"] = (
-            f"Apple Container {recommended} is recommended (you have {major}.{minor}). "
-            f"It adds XPC request validation, kernel archive integrity checks, and a fix for "
-            f"symlink following when copying user configuration. Upgrade with `brew upgrade container`."
+            f"Apple Container {recommended} is recommended (you have {version_text}). "
+            "It includes upstream image-loading and Unix socket security fixes. "
+            "Upgrade with `brew upgrade container`."
         )
     return result

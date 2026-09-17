@@ -3,12 +3,14 @@
 import os
 from typing import Dict, Any, List, Optional
 
+from ..cli_wrapper import _detect_cli_version, LONG_RUNNING_TIMEOUT_SECONDS
 from . import (
     mcp,
     _DESTRUCTIVE,
     _DANGEROUS_FLAGS,
     _normalize_list_result,
     _validate_home_path,
+    _validate_scheme,
     _run_container_cmd,
     ContainerCLIError,
 )
@@ -39,10 +41,12 @@ def run_container(
     read_only_paths: Optional[List[str]] = None,
     masked_paths: Optional[List[str]] = None,
     args_override: Optional[List[str]] = None,
+    scheme: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Start a container from an image with optional resource constraints, networking, ports, env vars,
     volume mounts, and more. Pass a command to run via args_override.
+    scheme selects registry http or https explicitly; CLI 1.4.1 defaults to https.
     Use shm_size to set the size of /dev/shm (e.g. "1G").
 
     read_only_paths and masked_paths (Apple Container 1.2.1+, EXPERIMENTAL upstream) add extra
@@ -56,6 +60,9 @@ def run_container(
       run_container("my-app", rosetta=True, platform="linux/amd64")
       run_container("myapp", masked_paths=["/proc/kcore"], read_only_paths=["/etc"])
     """
+    error = _validate_scheme(scheme)
+    if error:
+        return {"status": "error", "message": error}
     # Lightweight input validation
     if ports:
         for p in ports:
@@ -95,6 +102,8 @@ def run_container(
             return {"status": "error", "message": f"env_file invalid: {path_error}"}
 
     cmd_args = ["run"]
+    if scheme is not None:
+        cmd_args.extend(["--scheme", scheme])
     if detach:
         cmd_args.append("-d")
     if rm:
@@ -357,3 +366,27 @@ def stats_container(containers: Optional[List[str]] = None) -> Dict[str, Any]:
         return {"status": "ok", "stats": result}
     except ContainerCLIError as e:
         return {"status": "error", "message": "Failed to retrieve container stats", "details": e.stderr}
+
+
+@mcp.tool(annotations=_DESTRUCTIVE)
+def clean_container(container_id: str) -> Dict[str, Any]:
+    """Reclaim unused filesystem space in one running container and its named volumes.
+
+    Requires CLI 1.4.1+. Mutates disk allocation, but does not delete the container
+    or prune resources. The container must already be running.
+    """
+    if not container_id.strip() or container_id.startswith("-"):
+        return {"status": "error", "message": "Provide a nonempty container ID that does not start with '-'."}
+    version = _detect_cli_version()
+    if version is None or version < (1, 4, 1):
+        return {"status": "error", "message": "clean_container requires a detectable Apple Container CLI 1.4.1+."}
+    try:
+        _run_container_cmd(["clean", container_id], timeout=LONG_RUNNING_TIMEOUT_SECONDS)
+        return {"status": "ok", "message": f"Reclaimed unused filesystem space in '{container_id}'."}
+    except ContainerCLIError as e:
+        return {
+            "status": "error",
+            "message": "Failed to clean container",
+            "details": e.stderr,
+            "exit_code": e.exit_code,
+        }

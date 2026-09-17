@@ -217,7 +217,7 @@ def test_system_property_list_error(mocker):
 def test_check_environment_ok_when_version_current(mocker):
     from apple_container_mcp.tools import system
 
-    mocker.patch.object(system, "_detect_cli_version", return_value=(1, 2))
+    mocker.patch.object(system, "_detect_cli_version", return_value=(1, 4, 1))
 
     result = system.check_environment()
 
@@ -229,7 +229,7 @@ def test_check_environment_ok_when_version_current(mocker):
 def test_check_environment_warns_on_old_version(mocker):
     from apple_container_mcp.tools import system
 
-    mocker.patch.object(system, "_detect_cli_version", return_value=(0, 12))
+    mocker.patch.object(system, "_detect_cli_version", return_value=(0, 12, 0))
 
     result = system.check_environment()
 
@@ -245,30 +245,30 @@ def test_check_environment_errors_when_cli_missing(mocker):
     result = system.check_environment()
 
     assert result["status"] == "error"
-    assert "not found" in result["message"].lower()
+    assert "could not be detected" in result["message"].lower()
 
 
 def test_check_environment_recommends_upgrade_on_older_minor(mocker):
     from apple_container_mcp.tools import system
 
-    mocker.patch.object(system, "_detect_cli_version", return_value=(1, 0))
+    mocker.patch.object(system, "_detect_cli_version", return_value=(1, 0, 0))
 
     result = system.check_environment()
 
     assert result["status"] == "ok"
-    assert result["cli_version"] == "1.0"
-    assert "1.2" in result["recommendation"]
+    assert result["cli_version"] == "1.0.0"
+    assert "1.4.1" in result["recommendation"]
 
 
 def test_check_environment_no_recommendation_on_current_minor(mocker):
     from apple_container_mcp.tools import system
 
-    mocker.patch.object(system, "_detect_cli_version", return_value=(1, 2))
+    mocker.patch.object(system, "_detect_cli_version", return_value=(1, 4, 1))
 
     result = system.check_environment()
 
     assert result["status"] == "ok"
-    assert result["cli_version"] == "1.2"
+    assert result["cli_version"] == "1.4.1"
     assert result.get("recommendation") is None
 
 
@@ -1789,7 +1789,7 @@ def test_set_machine_builds_settings(mocker):
 def test_create_machine_virtualization_flag(mocker):
     from apple_container_mcp.tools import machines
 
-    mocker.patch.object(machines, "_detect_cli_version", return_value=(1, 1))
+    mocker.patch.object(machines, "_detect_cli_version", return_value=(1, 1, 0))
     mock_cmd = mocker.patch.object(machines, "_run_container_cmd", return_value={})
 
     result = machines.create_machine("alpine:3.22", virtualization=True)
@@ -1803,7 +1803,7 @@ def test_create_machine_virtualization_flag(mocker):
 def test_create_machine_virtualization_requires_1_1(mocker):
     from apple_container_mcp.tools import machines
 
-    mocker.patch.object(machines, "_detect_cli_version", return_value=(1, 0))
+    mocker.patch.object(machines, "_detect_cli_version", return_value=(1, 0, 0))
     mock_cmd = mocker.patch.object(machines, "_run_container_cmd")
 
     result = machines.create_machine("alpine:3.22", virtualization=True)
@@ -1842,7 +1842,7 @@ def test_create_machine_no_virtualization_skips_version_probe(mocker):
 def test_set_machine_virtualization_kwarg(mocker):
     from apple_container_mcp.tools import machines
 
-    mocker.patch.object(machines, "_detect_cli_version", return_value=(1, 2))
+    mocker.patch.object(machines, "_detect_cli_version", return_value=(1, 2, 0))
     mock_cmd = mocker.patch.object(machines, "_run_container_cmd", return_value={})
 
     result = machines.set_machine(name="m1", virtualization=False)
@@ -1855,7 +1855,7 @@ def test_set_machine_virtualization_kwarg(mocker):
 def test_set_machine_virtualization_requires_1_1(mocker):
     from apple_container_mcp.tools import machines
 
-    mocker.patch.object(machines, "_detect_cli_version", return_value=(1, 0))
+    mocker.patch.object(machines, "_detect_cli_version", return_value=(1, 0, 0))
     mock_cmd = mocker.patch.object(machines, "_run_container_cmd")
 
     result = machines.set_machine(virtualization=True)
