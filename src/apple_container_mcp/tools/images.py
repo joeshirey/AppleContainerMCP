@@ -6,14 +6,28 @@ import threading
 import time
 from typing import Dict, Any, List, Optional
 
-from . import mcp, _DESTRUCTIVE, _normalize_list_result, _validate_home_path, _run_container_cmd, ContainerCLIError
+from . import (
+    mcp,
+    _DESTRUCTIVE,
+    _normalize_list_result,
+    _validate_home_path,
+    _run_container_cmd,
+    ContainerCLIError,
+    _validate_scheme,
+)
 
 
 @mcp.tool()
-def pull_image(image: str) -> Dict[str, Any]:
-    """Download an image from a registry."""
+def pull_image(image: str, scheme: Optional[str] = None) -> Dict[str, Any]:
+    """Download an image. scheme may explicitly select http or https; CLI 1.4.1 defaults to https."""
+    error = _validate_scheme(scheme)
+    if error:
+        return {"status": "error", "message": error}
+    args = ["image", "pull", image]
+    if scheme is not None:
+        args.extend(["--scheme", scheme])
     try:
-        _run_container_cmd(["image", "pull", image])
+        _run_container_cmd(args)
         return {"status": "ok", "message": f"Successfully pulled image '{image}'."}
     except ContainerCLIError as e:
         return {"status": "error", "message": f"Failed to pull image '{image}'.", "details": e.stderr}
@@ -242,14 +256,21 @@ def tag_image(source: str, target: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
-def push_image(image: str) -> Dict[str, Any]:
+def push_image(image: str, scheme: Optional[str] = None) -> Dict[str, Any]:
     """
     Push a local image to a container registry.
+    scheme may explicitly select http or https; CLI 1.4.1 defaults to https.
     The image name should include the registry host for non-Docker Hub registries.
     Example: push_image("registry.example.com/myapp:v1.0")
     """
+    error = _validate_scheme(scheme)
+    if error:
+        return {"status": "error", "message": error}
+    args = ["image", "push", image]
+    if scheme is not None:
+        args.extend(["--scheme", scheme])
     try:
-        _run_container_cmd(["image", "push", image])
+        _run_container_cmd(args)
         return {"status": "ok", "message": f"Successfully pushed image '{image}'."}
     except ContainerCLIError as e:
         return {"status": "error", "message": f"Failed to push image '{image}'.", "details": e.stderr}

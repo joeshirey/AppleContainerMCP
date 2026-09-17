@@ -83,6 +83,12 @@ _DANGEROUS_FLAGS: frozenset[str] = frozenset(
 )
 
 
+def _validate_scheme(scheme: str | None) -> str | None:
+    if scheme is not None and scheme not in ("http", "https"):
+        return "Registry scheme must be 'http' or 'https'."
+    return None
+
+
 def _normalize_list_result(result: Any) -> List[Any]:
     """
     Normalise the raw output from a ``container … ls`` command into a plain list.
@@ -150,6 +156,7 @@ from .system import (  # noqa: E402, F401
 )
 from .containers import (  # noqa: E402, F401
     run_container,
+    clean_container,
     list_containers,
     stop_container,
     start_container,

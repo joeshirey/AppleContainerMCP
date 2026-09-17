@@ -16,12 +16,14 @@ class ContainerCLIError(Exception):
         message (str): Human-readable error message.
         exit_code (int): The process exit code returned by the container CLI.
         stderr (str): The raw error output from the CLI.
+        stdout (str): Captured output, including status JSON on nonzero exits.
     """
 
-    def __init__(self, message: str, exit_code: int, stderr: str):
+    def __init__(self, message: str, exit_code: int, stderr: str, stdout: str = ""):
         super().__init__(message)
         self.exit_code = exit_code
         self.stderr = stderr
+        self.stdout = stdout
 
 
 # Default timeout for quick commands (status checks, rm, stop, ls, inspect, etc.)
@@ -37,18 +39,14 @@ LONG_RUNNING_COMMANDS = {"pull", "push", "start", "build"}
 # XPC v0 compatibility, so older CLIs cannot interoperate with a 1.0 install.
 MINIMUM_CLI_MAJOR_VERSION = 1
 
-# Recommended (not required) Apple Container CLI version as a (major, minor) tuple.
-# 1.2 shipped upstream security fixes worth having: XPC container-ID validation,
-# no symlink-following when copying user configuration, kernel archive integrity
-# checks, and removal of force unwraps in XPC error handling. Older 1.x releases
-# still work, so this drives an advisory rather than the hard version gate.
-RECOMMENDED_CLI_VERSION = (1, 2)
+# Recommended security patch release; older 1.x versions remain compatible.
+RECOMMENDED_CLI_VERSION = (1, 4, 1)
 
 
 @functools.lru_cache(maxsize=1)
-def _detect_cli_version() -> Optional[tuple[int, int]]:
+def _detect_cli_version() -> Optional[tuple[int, int, int]]:
     """
-    Return the installed `container` CLI version as a (major, minor) tuple, or None
+    Return the installed `container` CLI version as a (major, minor, patch) tuple, or None
     if the binary is missing or its version output cannot be parsed.
 
     Cached for the process lifetime so we shell out at most once. Daemon-independent:
@@ -58,10 +56,12 @@ def _detect_cli_version() -> Optional[tuple[int, int]]:
         proc = subprocess.run(["container", "--version"], capture_output=True, text=True, timeout=10)
     except (FileNotFoundError, OSError, subprocess.SubprocessError):
         return None
-    match = re.search(r"version\s+(\d+)\.(\d+)\.\d+", proc.stdout)
+    if proc.returncode != 0:
+        return None
+    match = re.search(r"version\s+(\d+)\.(\d+)\.(\d+)", proc.stdout)
     if not match:
         return None
-    return (int(match.group(1)), int(match.group(2)))
+    return (int(match.group(1)), int(match.group(2)), int(match.group(3)))
 
 
 def _detect_cli_major_version() -> Optional[int]:
@@ -196,7 +196,10 @@ def _run_container_cmd(args: List[str], timeout: Optional[int] = None) -> Any:
                 "The container-apiserver daemon is not running. Please start the system service first.",
                 e.returncode,
                 e.stderr,
+                e.stdout or "",
             ) from e
 
         # Generic failure fallback.
-        raise ContainerCLIError(f"Command failed with exit code {e.returncode}", e.returncode, e.stderr) from e
+        raise ContainerCLIError(
+            f"Command failed with exit code {e.returncode}", e.returncode, e.stderr, e.stdout or ""
+        ) from e

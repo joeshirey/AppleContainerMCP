@@ -62,6 +62,10 @@ def cleanup_environment() -> str:
 
 Please follow these steps carefully — cleanup operations are irreversible:
 
+For running containers on CLI 1.4.1+, `clean_container(container_id)` reclaims unused
+filesystem space without deleting containers or pruning volumes. Offer this as a
+separate option and run it only when requested; do not start containers to clean them.
+
 1. Call `list_containers(include_stopped=True)` to see all containers including stopped ones.
    - Identify which stopped containers can be safely removed.
 2. Call `list_images()` to see all local images.
@@ -79,21 +83,27 @@ Start by listing all containers now."""
 
 
 @mcp.prompt()
-def setup_private_registry(registry_url: str) -> str:
+def setup_private_registry(registry_url: str, scheme: Optional[str] = None) -> str:
     """
     Guide through logging into a private registry and pulling or pushing an image.
     """
+    from . import _validate_scheme
+
+    error = _validate_scheme(scheme)
+    if error:
+        raise ValueError(error)
+    scheme_hint = f', scheme="{scheme}"' if scheme is not None else ""
     return f"""You are helping set up authentication with a private container registry.
 
 Registry: {registry_url!r}
 
 Steps:
 1. Ask the user for their registry username and password (do not log or store them).
-2. Call `registry_login("{registry_url}", username="<username>", password="<password>")`.
+2. Call `registry_login("{registry_url}", username="<username>", password="<password>"{scheme_hint})`.
 3. If login succeeds, confirm and proceed with the user's intended operation:
-   - To pull an image: call `pull_image("<registry>/<image>:<tag>")`.
+   - To pull an image: call `pull_image("<registry>/<image>:<tag>"{scheme_hint})`.
    - To push an image: first `tag_image("local:tag", "{registry_url}/<image>:<tag>")`,
-     then `push_image("{registry_url}/<image>:<tag>")`.
+     then `push_image("{registry_url}/<image>:<tag>"{scheme_hint})`.
 4. If login fails, show the error and suggest checking credentials or network access.
 
 Start by asking the user for their credentials."""

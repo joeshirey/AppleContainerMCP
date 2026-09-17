@@ -266,7 +266,7 @@ def test_detect_cli_version_parses_major_and_minor(mocker):
     mock_result.returncode = 0
     mock_run.return_value = mock_result
 
-    assert cli_wrapper._detect_cli_version() == (1, 1)
+    assert cli_wrapper._detect_cli_version() == (1, 1, 0)
     assert cli_wrapper._detect_cli_major_version() == 1
 
 

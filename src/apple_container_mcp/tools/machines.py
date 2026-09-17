@@ -3,7 +3,7 @@
 from typing import Dict, Any, List, Optional
 
 from ..cli_wrapper import _detect_cli_version
-from . import mcp, _DESTRUCTIVE, _normalize_list_result, _run_container_cmd, ContainerCLIError
+from . import mcp, _DESTRUCTIVE, _normalize_list_result, _validate_scheme, _run_container_cmd, ContainerCLIError
 
 
 def _virtualization_version_error() -> "Dict[str, Any] | None":
@@ -15,7 +15,7 @@ def _virtualization_version_error() -> "Dict[str, Any] | None":
     reports any unsupported-flag error.
     """
     version = _detect_cli_version()
-    if version is not None and version < (1, 1):
+    if version is not None and version < (1, 1, 0):
         return {
             "status": "error",
             "message": (
@@ -37,20 +37,27 @@ def create_machine(
     set_default: bool = False,
     no_boot: bool = False,
     virtualization: bool = False,
+    scheme: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Create and boot a container machine (a persistent Linux environment) from an image.
     home_mount is one of 'ro', 'rw', 'none'.
+    scheme selects registry http or https; CLI 1.4.1 defaults to https.
     Set virtualization=True to enable nested virtualization (requires Apple Container 1.1+,
     Apple Silicon M3+, macOS 15+, and a guest kernel built with CONFIG_KVM=y).
     Example: create_machine("alpine:3.22", name="dev", cpus=4, memory="8G")
     """
+    error = _validate_scheme(scheme)
+    if error:
+        return {"status": "error", "message": error}
     if virtualization:
         version_error = _virtualization_version_error()
         if version_error:
             return version_error
 
     args = ["machine", "create"]
+    if scheme is not None:
+        args.extend(["--scheme", scheme])
     if name:
         args.extend(["--name", name])
     if cpus is not None:

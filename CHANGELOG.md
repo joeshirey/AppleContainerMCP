@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] - Unreleased
+
+### Added
+
+- Apple Container 1.4.1 support with patch-aware version detection and upgrade recommendations.
+- `clean_container` reclaims unused filesystem space in running containers and named volumes (1.4.1+).
+- Explicit `http`/`https` registry schemes for pull, push, run, machine creation, login, and the private-registry prompt.
+- Optional loopback Streamable HTTP server transport for local MCP testing; stdio remains the default.
+- Repeatable live smoke test covering lifecycle, copying, build, storage reclamation, registries, and d2c.
+
+### Fixed
+
+- Preserve stdout on failed CLI calls so stopped/unregistered service JSON is available to status tools.
+- Correct stopped-service detection and retain the richer 1.4.1 status payload and optional fields.
+- Reject unsuccessful CLI version probes and distinguish detection failure from a confirmed missing binary.
+
+### Compatibility
+
+- The minimum CLI policy remains 1.0+; 1.4.1 is recommended for its upstream security fixes.
+- `check_environment.cli_version` now includes major, minor, and patch.
+- Registry schemes default to the installed CLI behavior (HTTPS on 1.3+); HTTP requires explicit selection.
+
 ## [0.6.0] - 2026-08-18
 
 ### Added
