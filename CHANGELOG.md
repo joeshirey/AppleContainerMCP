@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Apple Container 1.5.0 support, validated against the installed 1.5.0 CLI and daemon.
 - Apple Container 1.4.1 support with patch-aware version detection and upgrade recommendations.
 - `clean_container` reclaims unused filesystem space in running containers and named volumes (1.4.1+).
 - Explicit `http`/`https` registry schemes for pull, push, run, machine creation, login, and the private-registry prompt.
@@ -23,7 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Compatibility
 
-- The minimum CLI policy remains 1.0+; 1.4.1 is recommended for its upstream security fixes.
+- The minimum CLI policy remains 1.0+; 1.5.0 is now recommended for its upstream security fixes (1.4.1 image loading and Unix sockets; 1.5.0 Kubernetes kubeconfig sanitization, GHSA-44v5-vx46-ghv6). `check_environment` recommends upgrading on anything older.
+- 1.5.0 removes `container k8s start` and adds `k8s create --cni`; this server does not wrap the Kubernetes plugin, so no tools changed. The `--kernel-arg` flag in the upstream reference is not new and remains deliberately unexposed.
 - `check_environment.cli_version` now includes major, minor, and patch.
 - Registry schemes default to the installed CLI behavior (HTTPS on 1.3+); HTTP requires explicit selection.
 

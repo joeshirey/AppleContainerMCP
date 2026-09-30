@@ -40,7 +40,7 @@ LONG_RUNNING_COMMANDS = {"pull", "push", "start", "build"}
 MINIMUM_CLI_MAJOR_VERSION = 1
 
 # Recommended security patch release; older 1.x versions remain compatible.
-RECOMMENDED_CLI_VERSION = (1, 4, 1)
+RECOMMENDED_CLI_VERSION = (1, 5, 0)
 
 
 @functools.lru_cache(maxsize=1)
