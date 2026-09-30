@@ -17,7 +17,7 @@ The package installs two commands. `apple-container-mcp` is the MCP server descr
    brew install uv
    ```
 
-3. **Apple Container CLI**: **Requires container CLI 1.0+; 1.4.1 is recommended and locally tested.** Use Apple Silicon with macOS 26 or newer. Version 1.4.1 includes upstream image-loading and Unix socket security fixes. `check_environment` reports the full patch version and recommends upgrading older installations. New tools have their own version requirements; `clean_container` requires 1.4.1+. Install via Homebrew, then start the system service:
+3. **Apple Container CLI**: **Requires container CLI 1.0+; 1.5.0 is recommended and locally tested.** Use Apple Silicon with macOS 26 or newer. Version 1.5.0 includes upstream security fixes for image loading, Unix sockets (1.4.1), and Kubernetes kubeconfig merging (1.5.0). `check_environment` reports the full patch version and recommends upgrading older installations. New tools have their own version requirements; `clean_container` requires 1.4.1+. Install via Homebrew, then start the system service:
 
    ```bash
    brew install container

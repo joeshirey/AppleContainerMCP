@@ -27,7 +27,7 @@ def test_version_detection_and_recommendation(mocker, version):
     assert cli_wrapper._detect_cli_version() == parts
     result = system.check_environment()
     assert result["cli_version"] == version
-    assert ("recommendation" in result) == ((1, 0, 0) <= parts < (1, 4, 1))
+    assert ("recommendation" in result) == ((1, 0, 0) <= parts < (1, 5, 0))
     assert probe.call_count == 1
 
 
