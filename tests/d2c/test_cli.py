@@ -29,7 +29,7 @@ def test_dry_run_images_prints_translation(capsys: pytest.CaptureFixture[str]) -
 
 
 def test_unsupported_command_exits_1(capsys: pytest.CaptureFixture[str]) -> None:
-    with patch("sys.argv", ["d2c", "commit", "mycontainer", "myimage"]):
+    with patch("sys.argv", ["d2c", "diff", "mycontainer"]):
         with pytest.raises(SystemExit) as exc:
             main()
     assert exc.value.code == 1

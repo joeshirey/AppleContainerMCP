@@ -3,12 +3,12 @@ import dataclasses
 from d2c.unsupported import UNSUPPORTED
 
 
-def test_commit_is_unsupported() -> None:
-    assert "commit" in UNSUPPORTED
+def test_commit_is_supported_since_1_6() -> None:
+    assert "commit" not in UNSUPPORTED
 
 
-def test_commit_hint_mentions_dockerfile() -> None:
-    assert "Dockerfile" in UNSUPPORTED["commit"].hint
+def test_diff_hint_mentions_exec() -> None:
+    assert "exec" in UNSUPPORTED["diff"].hint
 
 
 def test_pause_is_unsupported() -> None:
@@ -59,7 +59,7 @@ def test_unsupported_command_is_immutable() -> None:
     import pytest
 
     with pytest.raises(dataclasses.FrozenInstanceError):
-        UNSUPPORTED["commit"].hint = "changed"  # type: ignore[misc]
+        UNSUPPORTED["diff"].hint = "changed"  # type: ignore[misc]
 
 
 def test_compose_is_unsupported() -> None:

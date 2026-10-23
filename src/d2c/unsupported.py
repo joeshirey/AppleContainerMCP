@@ -7,9 +7,6 @@ class UnsupportedCommand:
 
 
 UNSUPPORTED: dict[str, UnsupportedCommand] = {
-    "commit": UnsupportedCommand(
-        hint="Build from a Dockerfile instead — Apple Container doesn't support creating images from running containers."
-    ),
     "compose": UnsupportedCommand(
         hint="No equivalent — Apple Container has no orchestration layer. Run containers individually with 'container run'."
     ),

@@ -266,7 +266,8 @@ def check_environment() -> Dict[str, Any]:
         recommended = ".".join(map(str, RECOMMENDED_CLI_VERSION))
         result["recommendation"] = (
             f"Apple Container {recommended} is recommended (you have {version_text}). "
-            "It includes upstream security fixes for image loading, Unix sockets, and Kubernetes kubeconfig merging. "
+            "It includes upstream security fixes for image loading, Unix sockets, Kubernetes kubeconfig merging, "
+            "digest-pinned image pulls, and build-context symlink handling. "
             "Upgrade with `brew upgrade container`."
         )
     return result

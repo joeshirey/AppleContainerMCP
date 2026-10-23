@@ -23,6 +23,10 @@ COMMANDS: dict[str, CommandTranslation] = {
     "create": CommandTranslation(container_cmd=["container", "create"]),
     "export": CommandTranslation(container_cmd=["container", "export"]),
     "stats": CommandTranslation(container_cmd=["container", "stats"]),
+    "commit": CommandTranslation(
+        container_cmd=["container", "commit"],
+        note="'commit' requires Apple Container 1.6+ and does not support Docker's -a/-c/-m/-p options",
+    ),
     # Image commands
     "images": CommandTranslation(container_cmd=["container", "image", "list"]),
     "pull": CommandTranslation(container_cmd=["container", "image", "pull"]),

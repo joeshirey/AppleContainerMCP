@@ -17,7 +17,7 @@ The package installs two commands. `apple-container-mcp` is the MCP server descr
    brew install uv
    ```
 
-3. **Apple Container CLI**: **Requires container CLI 1.0+; 1.5.0 is recommended and locally tested.** Use Apple Silicon with macOS 26 or newer. Version 1.5.0 includes upstream security fixes for image loading, Unix sockets (1.4.1), and Kubernetes kubeconfig merging (1.5.0). `check_environment` reports the full patch version and recommends upgrading older installations. New tools have their own version requirements; `clean_container` requires 1.4.1+. Install via Homebrew, then start the system service:
+3. **Apple Container CLI**: **Requires container CLI 1.0+; 1.6.0 is recommended and locally tested.** Use Apple Silicon with macOS 26 or newer. Version 1.6.0 includes upstream security fixes for image loading, Unix sockets (1.4.1), Kubernetes kubeconfig merging (1.5.0), digest-pinned pulls, and build-context symlinks (1.6.0). `check_environment` reports the full patch version and recommends upgrading older installations. New tools have their own version requirements: `clean_container` requires 1.4.1+, and `commit_container` and `run_container(network_aliases=...)` require 1.6.0+. Install via Homebrew, then start the system service:
 
    ```bash
    brew install container
@@ -304,6 +304,21 @@ services it returns `status="error"` with the upstream status payload;
 `clean_container(container_id)` reclaims unused filesystem space in an already
 running container. It does not remove containers or replace prune operations.
 
+### Commit and DNS aliases on 1.6.0
+
+`commit_container(container_id, reference)` saves a running or stopped
+container's filesystem as a local image. The image records the container's
+process as its entrypoint and command, so pass `entrypoint` (and
+`args_override`) to `run_container` to run something else from it.
+
+`run_container(network_aliases=[...])` gives a container extra DNS names on its
+network (`default` when `network` is unset). Exact aliases need two labels
+(`api.test`). A leading-dot alias (`.api.test`) matches every name below it and
+must sit below the container's hostname or one of its exact aliases. Aliases
+resolve only under a DNS domain registered with `sudo container system dns create`.
+Other per-attachment options such as MTU go directly in `network`, for example
+`network="app-net,mtu=1400"`; `container network create` has no MTU flag.
+
 ---
 
 ## 💬 10 Natural Language Prompt Examples
@@ -328,7 +343,7 @@ Once the MCP server is configured in your LLM client, you can use natural langua
 ### Tools Exposed
 
 - **System**: `check_apiserver_status`, `start_system`, `stop_system`, `system_status`, `system_version`, `system_property_list`, `system_df`, `system_logs`, `check_environment`
-- **Containers**: `run_container` (supports `--init-image`, rosetta, platform, labels, `shm_size`, and more), `list_containers`, `start_container`, `stop_container`, `remove_container`, `export_container`, `inspect_container`, `exec_in_container`, `get_logs`, `prune_containers`, `stats_container`, `clean_container` (1.4.1+, reclaims filesystem space in a running container and its named volumes)
+- **Containers**: `run_container` (supports `--init-image`, rosetta, platform, labels, `shm_size`, and more), `list_containers`, `start_container`, `stop_container`, `remove_container`, `export_container`, `commit_container` (1.6.0+), `inspect_container`, `exec_in_container`, `get_logs`, `prune_containers`, `stats_container`, `clean_container` (1.4.1+, reclaims filesystem space in a running container and its named volumes)
 - **Files**: `copy_to_container`, `copy_from_container`
 - **Machines**: `create_machine` (supports nested virtualization on container 1.1+), `run_machine`, `list_machines`, `inspect_machine`, `set_machine`, `set_default_machine`, `machine_logs`, `stop_machine`, `delete_machine`
 - **Images**: `list_images`, `pull_image`, `build_image`, `check_build_status`, `list_builds`, `tag_image`, `push_image`, `inspect_image`, `remove_image`, `prune_images`
@@ -387,7 +402,7 @@ Without `--dry-run`, `d2c` executes the translated command and exits with that c
 
 ### What it translates
 
-Thirty Docker commands map onto Apple Container equivalents, covering container lifecycle (`ps`, `run`, `exec`, `stop`, `start`, `kill`, `rm`, `logs`, `inspect`, `cp`, `create`, `export`, `stats`), images (`images`, `pull`, `push`, `rmi`, `tag`, `build`, `load`, `save`), registry auth (`login`, `logout`), and the `network` / `volume` / `system` / `image` / `builder` management groups. Where a name differs enough to be surprising, the translation carries a note explaining the mapping.
+Thirty-one Docker commands map onto Apple Container equivalents, covering container lifecycle (`ps`, `run`, `exec`, `stop`, `start`, `kill`, `rm`, `logs`, `inspect`, `cp`, `create`, `export`, `stats`, `commit` on 1.6+), images (`images`, `pull`, `push`, `rmi`, `tag`, `build`, `load`, `save`), registry auth (`login`, `logout`), and the `network` / `volume` / `system` / `image` / `builder` management groups. Where a name differs enough to be surprising, the translation carries a note explaining the mapping.
 
 The Docker management namespace is stripped automatically, so `docker container run ubuntu` and `docker run ubuntu` both resolve to `container run ubuntu`.
 
@@ -397,7 +412,7 @@ Flags after the command are passed through unchanged. `d2c` renames commands, no
 
 ### Commands with no equivalent
 
-Twenty-four Docker commands have no Apple Container counterpart. Rather than failing with a confusing CLI error, `d2c` refuses them up front and suggests what to do instead:
+Twenty-three Docker commands have no Apple Container counterpart. Rather than failing with a confusing CLI error, `d2c` refuses them up front and suggests what to do instead:
 
 ```console
 $ d2c compose up
@@ -405,7 +420,7 @@ $ d2c compose up
    Hint: No equivalent — Apple Container has no orchestration layer. Run containers individually with 'container run'.
 ```
 
-This covers the Swarm family (`service`, `stack`, `swarm`, `node`, `secret`, `config`), image operations Apple Container does not implement (`commit`, `import`, `history`, `manifest`, `search`), lifecycle gaps (`pause`, `unpause`, `restart`, `rename`, `attach`, `wait`, `port`, `diff`, `events`, `checkpoint`), plus `compose`, `context`, and `plugin`.
+This covers the Swarm family (`service`, `stack`, `swarm`, `node`, `secret`, `config`), image operations Apple Container does not implement (`import`, `history`, `manifest`, `search`), lifecycle gaps (`pause`, `unpause`, `restart`, `rename`, `attach`, `wait`, `port`, `diff`, `events`, `checkpoint`), plus `compose`, `context`, and `plugin`.
 
 ### Docker global flags
 

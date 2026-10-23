@@ -1,6 +1,6 @@
 """Opt-in live smoke test: uv run python scripts/smoke_test.py.
 
-Requires a running Apple Container 1.4.1+ service. Creates uniquely named
+Requires a running Apple Container 1.6.0+ service. Creates uniquely named
 resources and removes only those resources; never stops the system or prunes.
 """
 
@@ -37,6 +37,7 @@ def main():
     created_networks = []
     image = prefix + ":test"
     built = False
+    committed_image = None
     registry_image = None
 
     def step(name, result):
@@ -62,13 +63,17 @@ def main():
                 "alpine:3.22",
                 name=prefix,
                 network=prefix,
+                network_aliases=[f"api-{prefix}.test", f".api-{prefix}.test"],
                 volumes=[f"{prefix}-rw:/data", f"{prefix}-ro:/readonly:ro"],
                 args_override=["sh", "-c", "echo smoke-ready; sleep 600"],
             ),
         )
         created_containers.append(prefix)
         step("list", tools.list_containers())
-        step("inspect", tools.inspect_container(prefix))
+        inspection = step("inspect", tools.inspect_container(prefix))["inspection"]
+        aliases = inspection[0]["configuration"]["networks"][0]["options"]["aliases"]
+        assert aliases == [f"api-{prefix}.test", f".api-{prefix}.test"], aliases
+        print("PASS network aliases recorded", flush=True)
         step("logs", tools.get_logs(prefix))
         step("stats", tools.stats_container([prefix]))
         step("exec", tools.exec_in_container(prefix, ["sh", "-c", "echo smoke > /data/check; cat /data/check"]))
@@ -86,6 +91,16 @@ def main():
             assert tools.clean_container(prefix)["status"] == "error"
             print("PASS clean rejects stopped container", flush=True)
             step("start", tools.start_container(prefix))
+            step("exec marker", tools.exec_in_container(prefix, ["sh", "-c", "echo committed > /committed"]))
+            committed = step("commit", tools.commit_container(prefix, prefix + "-commit:test"))
+            committed_image = committed["image"]
+            result = step(
+                "run committed image",
+                tools.run_container(
+                    committed_image, detach=False, rm=True, entrypoint="cat", args_override=["/committed"]
+                ),
+            )
+            assert result["id"].strip().endswith("committed"), result
             step("builder start", tools.builder_start())
             (context / "Dockerfile").write_text('FROM alpine:3.22\nRUN echo built > /built\nCMD ["cat", "/built"]\n')
             result = step("build submitted", tools.build_image(str(context), tag=image))
@@ -143,6 +158,8 @@ def main():
             cleanup("remove network", tools.remove_network(name))
         if registry_image:
             cleanup("remove registry tag", tools.remove_image(registry_image))
+        if committed_image:
+            cleanup("remove committed image", tools.remove_image(committed_image))
         if built:
             cleanup("remove built image", tools.remove_image(image))
         if cleanup_errors and sys.exc_info()[0] is None:

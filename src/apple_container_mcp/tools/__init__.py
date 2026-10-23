@@ -162,6 +162,7 @@ from .containers import (  # noqa: E402, F401
     start_container,
     remove_container,
     export_container,
+    commit_container,
     get_logs,
     inspect_container,
     exec_in_container,

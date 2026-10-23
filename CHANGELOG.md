@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Apple Container 1.6.0 support, validated against the installed 1.6.0 CLI and daemon.
+- `commit_container` creates a local image from a running or stopped container (1.6.0+).
+- `run_container` gains `network_aliases` for extra DNS names on the container's network attachment (1.6.0+).
+- `d2c commit` now translates to `container commit` instead of being refused.
 - Apple Container 1.5.0 support, validated against the installed 1.5.0 CLI and daemon.
 - Apple Container 1.4.1 support with patch-aware version detection and upgrade recommendations.
 - `clean_container` reclaims unused filesystem space in running containers and named volumes (1.4.1+).
@@ -18,13 +22,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `create_network` no longer passes `--mtu`, which `container network create` has never accepted, so every call with `mtu` failed. The `mtu` parameter is removed; set MTU per attachment with `run_container(network="name,mtu=N")`.
 - Preserve stdout on failed CLI calls so stopped/unregistered service JSON is available to status tools.
 - Correct stopped-service detection and retain the richer 1.4.1 status payload and optional fields.
 - Reject unsuccessful CLI version probes and distinguish detection failure from a confirmed missing binary.
 
 ### Compatibility
 
-- The minimum CLI policy remains 1.0+; 1.5.0 is now recommended for its upstream security fixes (1.4.1 image loading and Unix sockets; 1.5.0 Kubernetes kubeconfig sanitization, GHSA-44v5-vx46-ghv6). `check_environment` recommends upgrading on anything older.
+- The minimum CLI policy remains 1.0+; 1.6.0 is now recommended for its upstream security fixes (1.4.1 image loading and Unix sockets; 1.5.0 Kubernetes kubeconfig sanitization, GHSA-44v5-vx46-ghv6; 1.6.0 digest verification on pinned pulls, GHSA-vgrw-36j7-r93w, and build-context symlink containment, GHSA-fqxg-rrf3-358v). `check_environment` recommends upgrading on anything older.
+- 1.6.0 moves `container build` and `container builder` into a CLI plugin. Command names, flags, and `builder status --format json` are unchanged, so the build and builder tools need no changes. Multi-worker Kubernetes clusters do not affect this server, which does not wrap the Kubernetes plugin.
 - 1.5.0 removes `container k8s start` and adds `k8s create --cni`; this server does not wrap the Kubernetes plugin, so no tools changed. The `--kernel-arg` flag in the upstream reference is not new and remains deliberately unexposed.
 - `check_environment.cli_version` now includes major, minor, and patch.
 - Registry schemes default to the installed CLI behavior (HTTPS on 1.3+); HTTP requires explicit selection.
