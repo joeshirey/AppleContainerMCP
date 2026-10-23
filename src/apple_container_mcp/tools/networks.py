@@ -6,13 +6,16 @@ from . import mcp, _DESTRUCTIVE, _normalize_list_result, _run_container_cmd, Con
 
 
 @mcp.tool()
-def create_network(name: str, subnet: Optional[str] = None, mtu: Optional[int] = None) -> Dict[str, Any]:
-    """Creates a new network with the given name, optional subnet, and optional MTU."""
+def create_network(name: str, subnet: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Creates a new network with the given name and optional subnet.
+
+    `container network create` has no --mtu flag. MTU is set per attachment instead,
+    e.g. run_container(..., network="my-net,mtu=1400").
+    """
     args = ["network", "create"]
     if subnet:
         args.extend(["--subnet", subnet])
-    if mtu:
-        args.extend(["--mtu", str(mtu)])
     args.append(name)
     try:
         _run_container_cmd(args)

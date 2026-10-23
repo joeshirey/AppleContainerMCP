@@ -27,6 +27,12 @@ def test_rmi_translates_and_has_note() -> None:
     assert len(note) > 0
 
 
+def test_commit_translates_and_has_note() -> None:
+    args, note = translate(["commit", "web", "web-snapshot:v1"])
+    assert args == ["container", "commit", "web", "web-snapshot:v1"]
+    assert note is not None and "1.6" in note
+
+
 def test_pull_translates_to_image_pull() -> None:
     args, note = translate(["pull", "nginx"])
     assert args == ["container", "image", "pull", "nginx"]

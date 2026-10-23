@@ -1,4 +1,4 @@
-"""Container lifecycle tools: run, list, start, stop, remove, export, exec, logs, inspect, prune."""
+"""Container lifecycle tools: run, list, start, stop, remove, export, commit, exec, logs, inspect, prune."""
 
 import os
 from typing import Dict, Any, List, Optional
@@ -29,6 +29,7 @@ def run_container(
     env_file: Optional[str] = None,
     volumes: Optional[List[str]] = None,
     network: Optional[str] = None,
+    network_aliases: Optional[List[str]] = None,
     init_image: Optional[str] = None,
     entrypoint: Optional[str] = None,
     rm: bool = False,
@@ -49,6 +50,13 @@ def run_container(
     scheme selects registry http or https explicitly; CLI 1.4.1 defaults to https.
     Use shm_size to set the size of /dev/shm (e.g. "1G").
 
+    network_aliases (Apple Container 1.6.0+) gives the container extra DNS names on its
+    network (the "default" network when network is unset). Exact aliases need two labels
+    ("api.test"). A leading-dot alias (".api.test") matches every name below it and must sit
+    below the container's own hostname or one of its exact aliases. Aliases are fixed at
+    creation and resolve only under a DNS domain registered with `container system dns create`.
+    network also accepts per-attachment options directly, e.g. "my-net,mtu=1400".
+
     read_only_paths and masked_paths (Apple Container 1.2.1+, EXPERIMENTAL upstream) add extra
     in-guest paths to the runtime's default read-only/masked lists — they only tighten isolation.
     The upstream CLI also accepts a "NONE" sentinel there to clear the defaults and widen the
@@ -59,6 +67,7 @@ def run_container(
       run_container("ubuntu", rm=True, detach=False, args_override=["bash", "-c", "echo hi"])
       run_container("my-app", rosetta=True, platform="linux/amd64")
       run_container("myapp", masked_paths=["/proc/kcore"], read_only_paths=["/etc"])
+      run_container("nginx", name="gateway", network_aliases=["api.test", ".api.test"])
     """
     error = _validate_scheme(scheme)
     if error:
@@ -78,6 +87,21 @@ def run_container(
         for v in volumes:
             if ":" not in v:
                 return {"status": "error", "message": f"Invalid volume format: {v}. Expected 'HOST:CONTAINER'."}
+
+    # Aliases are appended to the comma-separated --network spec, so a comma or
+    # "=" would inject extra attachment options.
+    if network_aliases:
+        for alias in network_aliases:
+            if not alias.strip() or any(c in alias for c in ",= \t\n"):
+                return {
+                    "status": "error",
+                    "message": f"Invalid network alias: {alias!r}. Aliases must be nonempty DNS names "
+                    "without commas, '=', or whitespace.",
+                }
+        version = _detect_cli_version()
+        # Undetectable version → don't block; the CLI reports unsupported options itself.
+        if version is not None and version < (1, 6, 0):
+            return {"status": "error", "message": "network_aliases requires Apple Container CLI 1.6.0+."}
 
     # The CLI treats "NONE" as a sentinel that clears the runtime's default
     # read-only/masked paths instead of adding to them, which weakens the
@@ -116,8 +140,11 @@ def run_container(
         cmd_args.extend(["--memory", memory])
     if shm_size:
         cmd_args.extend(["--shm-size", shm_size])
-    if network:
-        cmd_args.extend(["--network", network])
+    if network or network_aliases:
+        spec = network or "default"
+        for alias in network_aliases or []:
+            spec += f",alias={alias}"
+        cmd_args.extend(["--network", spec])
     if entrypoint:
         cmd_args.extend(["--entrypoint", entrypoint])
     if platform:
@@ -242,6 +269,38 @@ def export_container(container_id: str, output_file: Optional[str] = None) -> Di
         return {"status": "ok", "message": f"Successfully exported container {container_id} to {output_file}."}
     except ContainerCLIError as e:
         return {"status": "error", "message": f"Failed to export container {container_id}.", "details": e.stderr}
+
+
+@mcp.tool()
+def commit_container(container_id: str, reference: str) -> Dict[str, Any]:
+    """
+    Create a new local image from a container's filesystem (Apple Container 1.6.0+).
+
+    Works on running and stopped containers. The image records the container's process
+    as its entrypoint and command, so pass entrypoint/args_override to run_container to
+    run something else. An unqualified reference such as "my-snapshot:v1" is stored
+    under docker.io/library/.
+
+    Example:
+      commit_container("myapp", "myapp-snapshot:v1")
+    """
+    for label, value in (("container_id", container_id), ("reference", reference)):
+        if not value.strip() or value.startswith("-"):
+            return {"status": "error", "message": f"Provide a nonempty {label} that does not start with '-'."}
+    version = _detect_cli_version()
+    if version is None or version < (1, 6, 0):
+        return {"status": "error", "message": "commit_container requires a detectable Apple Container CLI 1.6.0+."}
+    try:
+        result = _run_container_cmd(["commit", container_id, reference], timeout=LONG_RUNNING_TIMEOUT_SECONDS)
+        image = result.get("raw_output", reference) if isinstance(result, dict) else str(result)
+        return {"status": "ok", "image": image, "message": f"Committed container {container_id} to {image}."}
+    except ContainerCLIError as e:
+        return {
+            "status": "error",
+            "message": f"Failed to commit container {container_id}.",
+            "details": e.stderr,
+            "exit_code": e.exit_code,
+        }
 
 
 # --- Inspection & Logs ---
