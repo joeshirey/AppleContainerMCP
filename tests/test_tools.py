@@ -248,7 +248,7 @@ def test_check_environment_errors_when_cli_missing(mocker):
     assert "could not be detected" in result["message"].lower()
 
 
-def test_check_environment_recommends_upgrade_on_older_minor(mocker):
+def test_check_environment_recommends_upgrade_on_older_version(mocker):
     from apple_container_mcp.tools import system
 
     mocker.patch.object(system, "_detect_cli_version", return_value=(1, 6, 0))
@@ -260,7 +260,7 @@ def test_check_environment_recommends_upgrade_on_older_minor(mocker):
     assert "1.6.1" in result["recommendation"]
 
 
-def test_check_environment_no_recommendation_on_current_minor(mocker):
+def test_check_environment_no_recommendation_on_current_version(mocker):
     from apple_container_mcp.tools import system
 
     mocker.patch.object(system, "_detect_cli_version", return_value=(1, 6, 1))
