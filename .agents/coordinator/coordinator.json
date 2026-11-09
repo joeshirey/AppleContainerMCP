@@ -1,0 +1,70 @@
+{
+  "gh_cli": "gh",
+  "backlog_source": "auto",
+  "tickets_dir": ".agents/coordinator/tickets",
+  "backlog_command": null,
+  "delivery_mode": "github_pr",
+  "base_branch": "main",
+  "gate_command": "uv run ruff check src/ tests/ && uv run ruff format --check src/ tests/ && uv run mypy src/ && uv run pytest tests/ --cov=apple_container_mcp --cov-report=term-missing --cov-fail-under=90 && uv lock --check",
+  "project_id": null,
+  "owner_login": "joeshirey",
+  "default_reviewers": [],
+  "teammate_logins": [],
+  "settle_seconds": 300,
+  "dry_run": false,
+  "auto_merge": true,
+  "worktree_root": null,
+  "shared_contract_patterns": [
+    "pyproject.toml",
+    "uv.lock",
+    "poetry.lock",
+    "requirements*.txt",
+    "package.json",
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    "yarn.lock",
+    "Cargo.toml",
+    "Cargo.lock",
+    "go.mod",
+    "go.sum",
+    "migrations/**",
+    "schema/**"
+  ],
+  "test_file_globs": [
+    "tests/**",
+    "test/**",
+    "**/test_*.py",
+    "**/*_test.py",
+    "**/*_test.go",
+    "**/*.test.*",
+    "**/*.spec.*"
+  ],
+  "fast_track_globs": [
+    "**/*.md",
+    "docs/**",
+    "LICENSE",
+    ".gitignore",
+    ".agents/**"
+  ],
+  "nit_collector_issues": {
+    "default": null
+  },
+  "human_only_labels": [
+    "ready-for-human",
+    "human-only"
+  ],
+  "epic_labels": [
+    "epic",
+    "nit-collector"
+  ],
+  "bot_logins": [
+    "github-actions",
+    "github-actions[bot]",
+    "dependabot[bot]",
+    "renovate[bot]",
+    "code-review",
+    "code-review[bot]"
+  ],
+  "ignored_check_names": [],
+  "protected_resources_note": "Never mutate production databases, cloud state, or release tags without explicit operator approval in chat."
+}
