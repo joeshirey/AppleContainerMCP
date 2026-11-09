@@ -18,9 +18,25 @@ def clear_version_cache():
 
 
 @pytest.mark.parametrize(
-    "version", ["0.12.0", "1.0.0", "1.2.2", "1.3.1", "1.4.0", "1.4.1", "1.5.0", "1.6.0", "1.6.1", "2.0.0"]
+    ("version", "expect_recommendation"),
+    [
+        ("0.12.0", False),
+        ("1.0.0", True),
+        ("1.2.2", True),
+        ("1.3.1", True),
+        ("1.4.0", True),
+        ("1.4.1", True),
+        ("1.5.0", True),
+        ("1.6.0", True),
+        ("1.6.1", True),
+        ("1.7.0", True),
+        ("1.7.1", False),
+        ("1.7.2", False),
+        ("1.8.0", False),
+        ("2.0.0", False),
+    ],
 )
-def test_version_detection_and_recommendation(mocker, version):
+def test_version_detection_and_recommendation(mocker, version, expect_recommendation):
     probe = mocker.patch(
         "subprocess.run",
         return_value=subprocess.CompletedProcess([], 0, f"container CLI version {version} (build: release)", ""),
@@ -29,7 +45,9 @@ def test_version_detection_and_recommendation(mocker, version):
     assert cli_wrapper._detect_cli_version() == parts
     result = system.check_environment()
     assert result["cli_version"] == version
-    assert ("recommendation" in result) == ((1, 0, 0) <= parts < (1, 6, 1))
+    assert ("recommendation" in result) is expect_recommendation
+    if expect_recommendation:
+        assert "1.7.1" in result["recommendation"]
     assert probe.call_count == 1
 
 

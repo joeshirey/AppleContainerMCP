@@ -205,7 +205,14 @@ def run_container(
 
 @mcp.tool()
 def list_containers(include_stopped: bool = True) -> Dict[str, Any]:
-    """View running (and optionally stopped) containers."""
+    """
+    View running (and optionally stopped) containers.
+
+    In Apple Container 1.7.1+, `container list` hides `cluster` nodes even with `--all`
+    (and `-a`), and `start`, `stop`, `kill`, and `delete` report named cluster nodes as
+    not found. `inspect`, `logs`, `exec`, `stats`, and `clean` continue to work on named
+    cluster nodes; manage cluster lifecycle via the `container cluster` CLI plugin.
+    """
     args = ["ls"]
     if include_stopped:
         args.append("-a")
@@ -220,7 +227,14 @@ def list_containers(include_stopped: bool = True) -> Dict[str, Any]:
 
 @mcp.tool(annotations=_DESTRUCTIVE)
 def stop_container(container_id: str, force: bool = False) -> Dict[str, Any]:
-    """Gracefully or forcefully terminate a container."""
+    """
+    Gracefully or forcefully terminate a container.
+
+    In Apple Container 1.7.1+, `container list` hides `cluster` nodes even with `--all`,
+    and `start`, `stop`, `kill`, and `delete` report named cluster nodes as not found
+    (`inspect`, `logs`, `exec`, `stats`, and `clean` continue to work on named cluster
+    nodes).
+    """
     cmd = "kill" if force else "stop"
     try:
         _run_container_cmd([cmd, container_id])
@@ -231,7 +245,14 @@ def stop_container(container_id: str, force: bool = False) -> Dict[str, Any]:
 
 @mcp.tool()
 def start_container(container_id: str) -> Dict[str, Any]:
-    """Start a stopped container."""
+    """
+    Start a stopped container.
+
+    In Apple Container 1.7.1+, `container list` hides `cluster` nodes even with `--all`,
+    and `start`, `stop`, `kill`, and `delete` report named cluster nodes as not found
+    (`inspect`, `logs`, `exec`, `stats`, and `clean` continue to work on named cluster
+    nodes).
+    """
     try:
         _run_container_cmd(["start", container_id])
         return {"status": "ok", "message": f"Successfully started container {container_id}."}
@@ -241,7 +262,14 @@ def start_container(container_id: str) -> Dict[str, Any]:
 
 @mcp.tool(annotations=_DESTRUCTIVE)
 def remove_container(container_id: str, force: bool = False) -> Dict[str, Any]:
-    """Clean up container resources by removing a container."""
+    """
+    Clean up container resources by removing a container.
+
+    In Apple Container 1.7.1+, `container list` hides `cluster` nodes even with `--all`,
+    and `start`, `stop`, `kill`, and `delete` report named cluster nodes as not found
+    (`inspect`, `logs`, `exec`, `stats`, and `clean` continue to work on named cluster
+    nodes).
+    """
     args = ["rm"]
     if force:
         args.append("-f")
@@ -414,7 +442,11 @@ def stats_container(containers: Optional[List[str]] = None) -> Dict[str, Any]:
 
     Returns:
         On success: {"status": "ok", "stats": <list of per-container stats>}
-            Each entry is the parsed JSON object the CLI emits per container.
+            Each entry is the parsed `StatsReport` JSON object the CLI emits per
+            container. In Apple Container 1.7.1+, `StatsReport` includes an additive
+            `cpuUtilization` field (a core-fraction float where `1.0` equals one full
+            core), omitted when the second sample fails; parsed `StatsReport` entries
+            are returned unchanged whether `cpuUtilization` is present or omitted.
         On error:   {"status": "error", "message": str, "details": str}
     """
     args = ["stats", "--no-stream"]
