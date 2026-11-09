@@ -1,6 +1,6 @@
 """Opt-in live smoke test: uv run python scripts/smoke_test.py.
 
-Requires a running Apple Container 1.6.1+ service. Creates uniquely named
+Requires a running Apple Container 1.7.1+ service. Creates uniquely named
 resources and removes only those resources; never stops the system or prunes.
 """
 
@@ -75,7 +75,17 @@ def main():
         assert aliases == [f"api-{prefix}.test", f".api-{prefix}.test"], aliases
         print("PASS network aliases recorded", flush=True)
         step("logs", tools.get_logs(prefix))
-        step("stats", tools.stats_container([prefix]))
+        stats = step("stats", tools.stats_container([prefix])).get("stats")
+        assert isinstance(stats, list) and stats, stats
+        matching_stats = [entry for entry in stats if isinstance(entry, dict) and entry.get("id") == prefix]
+        assert matching_stats, stats
+        for entry in matching_stats:
+            if "cpuUtilization" in entry:
+                assert (
+                    isinstance(entry["cpuUtilization"], (int, float))
+                    and not isinstance(entry["cpuUtilization"], bool)
+                    and entry["cpuUtilization"] >= 0
+                ), entry
         step("exec", tools.exec_in_container(prefix, ["sh", "-c", "echo smoke > /data/check; cat /data/check"]))
         with tempfile.TemporaryDirectory(prefix=prefix, dir=Path.home()) as temp:
             context = Path(temp)

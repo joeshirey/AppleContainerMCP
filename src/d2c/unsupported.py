@@ -42,5 +42,11 @@ UNSUPPORTED: dict[str, UnsupportedCommand] = {
     "swarm": UnsupportedCommand(hint="Docker Swarm commands are not applicable to Apple Container."),
     "config": UnsupportedCommand(hint="Docker Swarm commands are not applicable to Apple Container."),
     "secret": UnsupportedCommand(hint="Docker Swarm commands are not applicable to Apple Container."),
-    "plugin": UnsupportedCommand(hint="No equivalent — Apple Container has no plugin system."),
+    "plugin": UnsupportedCommand(
+        hint=(
+            "No equivalent to Docker-style plugin management ('docker plugin install/enable/ls') — "
+            "Apple Container discovers bundled CLI plugins ('build', 'builder', 'cluster') "
+            "automatically when system services are running ('container system start')."
+        )
+    ),
 }
