@@ -68,3 +68,32 @@ def test_compose_is_unsupported() -> None:
 
 def test_compose_hint_mentions_run() -> None:
     assert "run" in UNSUPPORTED["compose"].hint
+
+
+def test_plugin_unsupported_hint_explains_bundled_cli_plugins() -> None:
+    assert "plugin" in UNSUPPORTED
+    hint = UNSUPPORTED["plugin"].hint
+    assert "no plugin system" not in hint.lower()
+    assert "docker plugin" in hint.lower()
+    for bundled_plugin in ("build", "builder", "cluster"):
+        assert bundled_plugin in hint
+    assert "container system start" in hint
+
+
+def test_d2c_plugin_cli_exits_1_with_bundled_plugin_hint(capsys) -> None:
+    from unittest.mock import patch
+
+    import pytest
+
+    from d2c.cli import main
+
+    with patch("sys.argv", ["d2c", "plugin", "ls"]):
+        with pytest.raises(SystemExit) as exc:
+            main()
+    assert exc.value.code == 1
+    out = capsys.readouterr().out
+    assert "not supported" in out
+    assert "no plugin system" not in out.lower()
+    for bundled_plugin in ("build", "builder", "cluster"):
+        assert bundled_plugin in out
+    assert "container system start" in out
