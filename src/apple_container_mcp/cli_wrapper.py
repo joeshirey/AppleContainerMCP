@@ -40,7 +40,7 @@ LONG_RUNNING_COMMANDS = {"pull", "push", "start", "build"}
 MINIMUM_CLI_MAJOR_VERSION = 1
 
 # Recommended security patch release; older 1.x versions remain compatible.
-RECOMMENDED_CLI_VERSION = (1, 6, 0)
+RECOMMENDED_CLI_VERSION = (1, 6, 1)
 
 
 @functools.lru_cache(maxsize=1)
@@ -191,9 +191,13 @@ def _run_container_cmd(args: List[str], timeout: Optional[int] = None) -> Any:
         logger.warning("Command failed (exit %d): %s — %s", e.returncode, " ".join(full_cmd), e.stderr.strip())
         # Detect and normalize 'daemon not running' errors which often have specific stderr signatures.
         stderr_msg = e.stderr.strip().lower()
-        if "connection refused" in stderr_msg or "cannot connect to the container daemon" in stderr_msg:
+        if (
+            "connection refused" in stderr_msg
+            or "cannot connect to the container daemon" in stderr_msg
+            or "plugins are unavailable" in stderr_msg
+        ):
             raise ContainerCLIError(
-                "The container-apiserver daemon is not running. Please start the system service first.",
+                "The container-apiserver daemon is not running or CLI plugins are unavailable. Please start the system service first ('container system start').",
                 e.returncode,
                 e.stderr,
                 e.stdout or "",

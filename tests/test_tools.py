@@ -217,7 +217,7 @@ def test_system_property_list_error(mocker):
 def test_check_environment_ok_when_version_current(mocker):
     from apple_container_mcp.tools import system
 
-    mocker.patch.object(system, "_detect_cli_version", return_value=(1, 6, 0))
+    mocker.patch.object(system, "_detect_cli_version", return_value=(1, 6, 1))
 
     result = system.check_environment()
 
@@ -248,19 +248,7 @@ def test_check_environment_errors_when_cli_missing(mocker):
     assert "could not be detected" in result["message"].lower()
 
 
-def test_check_environment_recommends_upgrade_on_older_minor(mocker):
-    from apple_container_mcp.tools import system
-
-    mocker.patch.object(system, "_detect_cli_version", return_value=(1, 0, 0))
-
-    result = system.check_environment()
-
-    assert result["status"] == "ok"
-    assert result["cli_version"] == "1.0.0"
-    assert "1.6.0" in result["recommendation"]
-
-
-def test_check_environment_no_recommendation_on_current_minor(mocker):
+def test_check_environment_recommends_upgrade_on_older_version(mocker):
     from apple_container_mcp.tools import system
 
     mocker.patch.object(system, "_detect_cli_version", return_value=(1, 6, 0))
@@ -269,6 +257,18 @@ def test_check_environment_no_recommendation_on_current_minor(mocker):
 
     assert result["status"] == "ok"
     assert result["cli_version"] == "1.6.0"
+    assert "1.6.1" in result["recommendation"]
+
+
+def test_check_environment_no_recommendation_on_current_version(mocker):
+    from apple_container_mcp.tools import system
+
+    mocker.patch.object(system, "_detect_cli_version", return_value=(1, 6, 1))
+
+    result = system.check_environment()
+
+    assert result["status"] == "ok"
+    assert result["cli_version"] == "1.6.1"
     assert result.get("recommendation") is None
 
 

@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.1] - 2026-11-03
+
+### Added
+- Apple Container 1.6.1 support, validated against the installed 1.6.1 CLI and daemon.
+- Normalization of "Plugins are unavailable" CLI errors when `container system start` has not been run.
+
+### Compatibility
+- The minimum CLI policy remains 1.0+; 1.6.1 is now recommended for upstream signal forwarding fixes, cluster concurrency fixes, and OCI platform/runtime auto-introspection.
+- Upstream renamed the Kubernetes CLI plugin from `container k8s` to `container cluster`.
+
 ## [0.7.0] - Unreleased
 
 ### Added

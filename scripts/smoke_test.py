@@ -1,6 +1,6 @@
 """Opt-in live smoke test: uv run python scripts/smoke_test.py.
 
-Requires a running Apple Container 1.6.0+ service. Creates uniquely named
+Requires a running Apple Container 1.6.1+ service. Creates uniquely named
 resources and removes only those resources; never stops the system or prunes.
 """
 
