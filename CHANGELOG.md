@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.2] - 2026-11-08
+
+### Added
+- Apple Container 1.7.1 support, validated against the installed 1.7.1 CLI.
+- `stats_container` contract and live smoke coverage for the additive `cpuUtilization` field in `StatsReport` (`1.0` equals one full core; omitted when the second sample fails).
+- Documentation across `list_containers`, `start_container`, `stop_container`, `remove_container`, and `system_property_list` covering the 1.7.1 cluster-node lifecycle boundary and `~/.config/container/config.toml` `[dns]` defaults (`dns`, `dns-search`, `dns-option`, `dns-domain`).
+
+### Changed
+- Clarified the `d2c` unsupported `plugin` command hint: Docker-style plugin management (`docker plugin install/enable/ls`) has no equivalent because Apple Container discovers bundled CLI plugins (`build`, `builder`, `cluster`) automatically when `container system start` is running.
+- Bumped `RECOMMENDED_CLI_VERSION` in `cli_wrapper.py` to `(1, 7, 1)` so `check_environment` recommends upgrading older `1.x` installations.
+
+### Compatibility
+- The minimum CLI policy remains 1.0+; 1.7.1 is now recommended.
+- In Apple Container 1.7.1+, `container list` hides `cluster` nodes even with `--all` (`-a`), and `start`, `stop`, `kill`, and `delete` report named cluster nodes as not found (`inspect`, `logs`, `exec`, `stats`, and `clean` continue to work on named cluster nodes; manage cluster lifecycles via `container cluster`).
+- Upstream 1.7.1 excludes container data volumes from Time Machine snapshots, fixes BuildKit `:authority` gRPC header and build-context regressions, and updates the runtime stack to Kata kernel `4.3.1` and Containerization `0.54.0`.
+
 ## [0.7.1] - 2026-11-03
 
 ### Added
@@ -15,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - The minimum CLI policy remains 1.0+; 1.6.1 is now recommended for upstream signal forwarding fixes, cluster concurrency fixes, and OCI platform/runtime auto-introspection.
 - Upstream renamed the Kubernetes CLI plugin from `container k8s` to `container cluster`.
 
-## [0.7.0] - Unreleased
+## [0.7.0] - 2026-10-23
 
 ### Added
 

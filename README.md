@@ -17,7 +17,7 @@ The package installs two commands. `apple-container-mcp` is the MCP server descr
    brew install uv
    ```
 
-3. **Apple Container CLI**: **Requires container CLI 1.0+; 1.6.1 is recommended and locally tested.** Use Apple Silicon with macOS 26 or newer. Version 1.6.1 infers platform and runtime from OCI images, fixes signal passing to container processes, renames `container k8s` to `container cluster`, and includes upstream security and stability fixes across image loading, Unix sockets, kubeconfig merging, digest-pinned pulls, and build-context symlinks. `check_environment` reports the full patch version and recommends upgrading older installations. New tools have their own version requirements: `clean_container` requires 1.4.1+, and `commit_container` and `run_container(network_aliases=...)` require 1.6.0+. Install via Homebrew, then start the system service:
+3. **Apple Container CLI**: **Requires container CLI 1.0+; 1.7.1 is recommended and locally tested.** Use Apple Silicon with macOS 26 or newer. Version 1.7.1 adds `cpuUtilization` to `container stats`, enforces a `cluster`-node lifecycle boundary (`container list` even with `--all` hides cluster nodes), supports `[dns]` defaults in `~/.config/container/config.toml`, excludes container data volumes from Time Machine snapshots, fixes BuildKit `:authority` gRPC headers and build-context handling, ships Kata kernel `4.3.1` and Containerization `0.54.0`, and retains all 1.4.1–1.6.1 security and stability fixes across image loading, Unix sockets, kubeconfig merging, digest-pinned pulls, build-context symlinks, OCI platform/runtime inference, and signal passing. `check_environment` reports the full patch version and recommends upgrading older installations. New tools have their own version requirements: `clean_container` requires 1.4.1+, and `commit_container` and `run_container(network_aliases=...)` require 1.6.0+. Install via Homebrew, then start the system service:
 
    ```bash
    brew install container
@@ -319,6 +319,26 @@ resolve only under a DNS domain registered with `sudo container system dns creat
 Other per-attachment options such as MTU go directly in `network`, for example
 `network="app-net,mtu=1400"`; `container network create` has no MTU flag.
 
+### Stats, cluster lifecycle, and DNS defaults on 1.7.1
+
+`stats_container` returns each container's `StatsReport` payload unchanged,
+including the additive `cpuUtilization` field added in 1.7.1 (`1.0` equals one
+full core; omitted when the second sample fails).
+
+`list_containers` (`container list`, including `-a` / `--all`) no longer lists
+`cluster` nodes on 1.7.1+, and `start_container`, `stop_container` (`stop` and
+`kill`), and `remove_container` (`delete`) report named cluster nodes as not
+found. `inspect_container`, `get_logs`, `exec_in_container`, `stats_container`,
+and `clean_container` still work on named cluster nodes; manage cluster
+lifecycles directly with the `container cluster` CLI plugin.
+
+`~/.config/container/config.toml` supports a `[dns]` table (`dns`,
+`dns-search`, `dns-option`, `dns-domain`) for default container DNS settings,
+complementing `system_property_list`. Upstream 1.7.1 also excludes container
+data volumes from Time Machine snapshots, fixes BuildKit `:authority` gRPC
+header and build-context regressions, and updates the runtime stack to Kata
+kernel `4.3.1` and Containerization `0.54.0`.
+
 ---
 
 ## 💬 10 Natural Language Prompt Examples
@@ -420,7 +440,7 @@ $ d2c compose up
    Hint: No equivalent — Apple Container has no orchestration layer. Run containers individually with 'container run'.
 ```
 
-This covers the Swarm family (`service`, `stack`, `swarm`, `node`, `secret`, `config`), image operations Apple Container does not implement (`import`, `history`, `manifest`, `search`), lifecycle gaps (`pause`, `unpause`, `restart`, `rename`, `attach`, `wait`, `port`, `diff`, `events`, `checkpoint`), plus `compose`, `context`, and `plugin`.
+This covers the Swarm family (`service`, `stack`, `swarm`, `node`, `secret`, `config`), image operations Apple Container does not implement (`import`, `history`, `manifest`, `search`), lifecycle gaps (`pause`, `unpause`, `restart`, `rename`, `attach`, `wait`, `port`, `diff`, `events`, `checkpoint`), plus `compose`, `context`, and `plugin` (Docker-style `docker plugin install/enable/ls` management has no counterpart because Apple Container discovers bundled CLI plugins — `build`, `builder`, and `cluster` — automatically when `container system start` is running).
 
 ### Docker global flags
 
