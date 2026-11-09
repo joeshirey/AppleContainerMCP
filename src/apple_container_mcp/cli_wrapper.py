@@ -39,8 +39,8 @@ LONG_RUNNING_COMMANDS = {"pull", "push", "start", "build"}
 # XPC v0 compatibility, so older CLIs cannot interoperate with a 1.0 install.
 MINIMUM_CLI_MAJOR_VERSION = 1
 
-# Recommended security patch release; older 1.x versions remain compatible.
-RECOMMENDED_CLI_VERSION = (1, 6, 1)
+# Recommended Apple Container CLI release; older 1.x versions remain compatible.
+RECOMMENDED_CLI_VERSION = (1, 7, 1)
 
 
 @functools.lru_cache(maxsize=1)

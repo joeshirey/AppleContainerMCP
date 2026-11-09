@@ -167,6 +167,10 @@ def system_property_list() -> Dict[str, Any]:
 
     Replaces the removed `system property get`/`set` subcommands. Requires the
     container system service to be running.
+
+    Starting in Apple Container 1.7.1, `~/.config/container/config.toml` also supports
+    `[dns]` TOML defaults (`dns`, `dns-search`, `dns-option`, `dns-domain`) for
+    container DNS configuration.
     """
     try:
         result = _run_container_cmd(["system", "property", "list"])
@@ -267,7 +271,7 @@ def check_environment() -> Dict[str, Any]:
         result["recommendation"] = (
             f"Apple Container {recommended} is recommended (you have {version_text}). "
             "It includes upstream security fixes for image loading, Unix sockets, Kubernetes kubeconfig merging, "
-            "digest-pinned image pulls, and build-context symlink handling. "
+            "digest-pinned image pulls, and build-context symlink handling, plus 1.7.1 runtime and cluster lifecycle updates. "
             "Upgrade with `brew upgrade container`."
         )
     return result
