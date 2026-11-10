@@ -1,5 +1,7 @@
 import dataclasses
 
+import pytest
+
 from d2c.unsupported import UNSUPPORTED
 
 
@@ -56,8 +58,6 @@ def test_all_hints_are_nonempty() -> None:
 
 
 def test_unsupported_command_is_immutable() -> None:
-    import pytest
-
     with pytest.raises(dataclasses.FrozenInstanceError):
         UNSUPPORTED["diff"].hint = "changed"  # type: ignore[misc]
 
@@ -80,10 +80,8 @@ def test_plugin_unsupported_hint_explains_bundled_cli_plugins() -> None:
     assert "container system start" in hint
 
 
-def test_d2c_plugin_cli_exits_1_with_bundled_plugin_hint(capsys) -> None:
+def test_d2c_plugin_cli_exits_1_with_bundled_plugin_hint(capsys: pytest.CaptureFixture[str]) -> None:
     from unittest.mock import patch
-
-    import pytest
 
     from d2c.cli import main
 

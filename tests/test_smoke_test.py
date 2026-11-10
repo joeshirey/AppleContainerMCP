@@ -82,6 +82,10 @@ def _run_smoke_main(
         state["running"] = True
         return {"status": "ok"}
 
+    def record_cleanup(bucket: list[str], name: str) -> dict[str, str]:
+        bucket.append(name)
+        return {"status": "ok"}
+
     fake_tools = SimpleNamespace(
         check_environment=lambda: {"status": "ok"},
         system_status=lambda: {"status": "ok"},
@@ -105,10 +109,10 @@ def _run_smoke_main(
         builder_start=lambda: {"status": "ok"},
         build_image=lambda *_a, **_kw: {"status": "ok", "build_id": "0000000000000001"},
         check_build_status=lambda _bid: {"status": "ok", "build_status": {"state": "completed"}},
-        remove_container=lambda name, **_kw: cleaned["containers"].append(name) or {"status": "ok"},
-        remove_volume=lambda name: cleaned["volumes"].append(name) or {"status": "ok"},
-        remove_network=lambda name: cleaned["networks"].append(name) or {"status": "ok"},
-        remove_image=lambda name: cleaned["images"].append(name) or {"status": "ok"},
+        remove_container=lambda name, **_kw: record_cleanup(cleaned["containers"], name),
+        remove_volume=lambda name: record_cleanup(cleaned["volumes"], name),
+        remove_network=lambda name: record_cleanup(cleaned["networks"], name),
+        remove_image=lambda name: record_cleanup(cleaned["images"], name),
     )
 
     def fake_subprocess_run(cmd: list[str], **_kwargs: Any) -> subprocess.CompletedProcess[str]:

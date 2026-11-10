@@ -174,10 +174,10 @@ def test_cluster_node_lifecycle_boundary_documented_and_enforced(mocker, tool_na
     assert "1.7.1" in description
     assert "cluster" in description.lower()
     assert "--all" in description
-    for blocked_op in ("start", "stop", "kill", "delete"):
+    for blocked_op in ("`start`", "`stop`", "`kill`", "`delete`"):
         assert blocked_op in description.lower()
     assert "not found" in description.lower()
-    for working_op in ("inspect", "logs", "exec", "stats", "clean"):
+    for working_op in ("`inspect`", "`logs`", "`exec`", "`stats`", "`clean`"):
         assert working_op in description.lower()
 
 
@@ -218,7 +218,7 @@ def test_cluster_node_supported_commands_succeed_on_named_cluster_node(mocker):
 
     descriptions = _tool_descriptions()
     for lifecycle_tool in ("list_containers", "start_container", "stop_container", "remove_container"):
-        for working_op in ("inspect", "logs", "exec", "stats", "clean"):
+        for working_op in ("`inspect`", "`logs`", "`exec`", "`stats`", "`clean`"):
             assert working_op in descriptions[lifecycle_tool].lower()
 
 
@@ -246,5 +246,5 @@ def test_system_property_list_documents_171_dns_toml_defaults(mocker):
     assert "1.7.1" in description
     assert "[dns]" in description
     assert "~/.config/container/config.toml" in description
-    for key in ("dns", "dns-search", "dns-option", "dns-domain"):
+    for key in ("`dns`", "`dns-search`", "`dns-option`", "`dns-domain`"):
         assert key in description

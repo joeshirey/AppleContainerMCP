@@ -29,7 +29,7 @@ This is local validation, not certification on every supported macOS/CLI release
   - `container --version` returned `container CLI version 1.6.1 (build: release, commit: unspeci)`.
   - Plugin directory inspection confirmed `build`, `builder`, `cluster`, `container-core-images`, `container-network-vmnet`, `container-runtime-linux`, and `machine-apiserver` in `/opt/homebrew/Cellar/container/1.6.1/libexec/container-plugins/`.
 - **Unit & Regression Suite:**
-  - `uv run pytest` executed 360 tests, all passing.
+  - `uv run pytest` executed 361 tests, all passing.
   - Normalization test `test_run_container_cmd_plugins_unavailable_normalized` passed.
   - Version upgrade recommendation tests updated and passing.
 - **Static Analysis & Formatting:**
