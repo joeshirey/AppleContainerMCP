@@ -69,7 +69,7 @@ def test_run_container_cmd_plugins_unavailable_normalized(mocker):
     """Test handling of plugin unavailability error when services are down."""
     mock_run = mocker.patch("subprocess.run")
     mock_run.side_effect = subprocess.CalledProcessError(
-        returncode=1,
+        returncode=64,
         cmd=["container", "build", "."],
         stderr="Error: Plugins are unavailable. Start the container system services and retry:\n\n    container system start\n",
     )
@@ -77,6 +77,8 @@ def test_run_container_cmd_plugins_unavailable_normalized(mocker):
     with pytest.raises(ContainerCLIError) as exc_info:
         _run_container_cmd(["build", "."])
 
+    assert exc_info.value.exit_code == 64
+    assert "daemon is not running" in str(exc_info.value).lower()
     assert "plugins are unavailable" in str(exc_info.value).lower()
     assert "container system start" in str(exc_info.value).lower()
 

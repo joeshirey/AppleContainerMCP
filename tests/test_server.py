@@ -3,6 +3,7 @@ from pathlib import Path
 import re
 import tomllib
 
+import mypy.api
 import pytest
 
 import apple_container_mcp
@@ -51,6 +52,19 @@ def test_packaging_manifests_version_0_7_2_lockstep():
     assert locked_versions == ["0.7.2"]
 
 
+def test_packaging_manifests_version_dynamic_lockstep():
+    pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    lockfile = tomllib.loads((REPO_ROOT / "uv.lock").read_text(encoding="utf-8"))
+
+    assert (
+        apple_container_mcp.__version__
+        == pyproject["project"]["version"]
+        == importlib.metadata.version("applecontainermcp")
+    )
+    locked_versions = [pkg.get("version") for pkg in lockfile["package"] if pkg.get("name") == "applecontainermcp"]
+    assert locked_versions == [pyproject["project"]["version"]]
+
+
 # ---------------------------------------------------------------------------
 # AC2 — README.md, CHANGELOG.md ([0.7.2]), and docs/TDD.md (1.7.1 audit)
 # ---------------------------------------------------------------------------
@@ -85,6 +99,7 @@ def test_changelog_0_7_2_release_notes_and_0_7_0_date():
     assert "## [0.7.2] - 2026-11-08" in changelog
     assert "## [0.7.0] - 2026-10-23" in changelog
     assert "## [0.7.0] - Unreleased" not in changelog
+    assert "Unreleased" not in changelog
 
     release_072 = changelog.split("## [0.7.2] - 2026-11-08", 1)[1].split("\n## [", 1)[0]
     for required_term in (
@@ -189,3 +204,25 @@ def test_1_7_1_validation_plan_records_live_cli_and_ci_outputs():
     ):
         assert required_term in plan_text
     assert ("smoke_test.py" in plan_text) or ("system status" in plan_text)
+
+
+def test_1_6_1_validation_plan_records_361_tests():
+    plan_path = REPO_ROOT / "docs" / "superpowers" / "plans" / "2026-11-03-apple-container-1.6.1-validation.md"
+    assert plan_path.is_file(), f"Missing 1.6.1 validation record: {plan_path}"
+
+    plan_text = plan_path.read_text(encoding="utf-8")
+    assert "361 tests" in plan_text
+    assert "360 tests" not in plan_text
+
+
+def test_smoke_and_d2c_unsupported_tests_pass_strict_mypy():
+    stdout, stderr, exit_status = mypy.api.run(
+        [
+            str(REPO_ROOT / "src"),
+            str(REPO_ROOT / "tests" / "test_smoke_test.py"),
+            str(REPO_ROOT / "tests" / "d2c" / "test_unsupported.py"),
+            "--config-file",
+            str(REPO_ROOT / "pyproject.toml"),
+        ]
+    )
+    assert exit_status == 0, f"mypy failed (exit {exit_status}):\n{stdout}\n{stderr}"
